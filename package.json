@@ -1,0 +1,21 @@
+{
+  "name": "bemo-automation",
+  "version": "1.0.0",
+  "description": "Bemo Time Off Automation",
+  "main": "src/create-timeoff.js",
+  "scripts": {
+    "auth": "node src/login.js",
+    "data:sync": "node src/get-attendance.js && node src/get-timeoff.js && node src/compare.js",
+    "data:clean": "rm -f data/*.json",
+    "off:create": "node src/create-timeoff.js",
+    "off:fast": "npm run off:create -- --fast",
+    "off:manual": "npm run off:create -- --manual --show",
+    "off:verify": "node src/verify-timeoff.js",
+    "run": "npm run data:sync && npm run off:fast && npm run off:verify",
+    "run:show": "npm run data:sync && npm run off:fast -- --show && npm run off:verify"
+  },
+  "dependencies": {
+    "dotenv": "^17.3.1",
+    "puppeteer-core": "^24.36.1"
+  }
+}
