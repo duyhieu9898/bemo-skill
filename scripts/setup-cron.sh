@@ -3,8 +3,8 @@ set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RUNNER="$PROJECT_DIR/scripts/run-cron-telegram.js"
-CRON_MARKER="bemo-automation-weekday-1730"
-CRON_SCHEDULE="${CRON_SCHEDULE:-30 17 * * 1-5}"
+CRON_MARKER="bemo-automation-checkout"
+CRON_SCHEDULE="${CRON_SCHEDULE:-0 17 * * 1-5}"
 CRON_LOG="$PROJECT_DIR/logs/cron.log"
 
 mkdir -p "$PROJECT_DIR/logs"
@@ -27,6 +27,6 @@ crontab "$NEW_CRON"
 rm -f "$CURRENT_CRON" "$NEW_CRON"
 
 printf 'Installed cron job:\n%s\n' "$CRON_LINE"
-printf '\nIt will run at 17:30, Monday through Friday, using the server timezone.\n'
+printf '\nIt will run at 17:00, Monday through Friday, using the server timezone.\n'
 printf 'Runner: %s\n' "$RUNNER"
 printf 'Cron log: %s\n' "$CRON_LOG"

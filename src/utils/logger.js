@@ -142,7 +142,7 @@ const compareLogger = {
  * Create Time Off module logger
  */
 const createTimeOffLogger = {
-  createStart: (date, checkInTime, lateMinutes, requiredHours, workStartTime = "08:15") => {
+  createStart: (date, checkInTime, lateMinutes, requiredHours, workStartTime) => {
     baseLog.raw(`\n${ICONS.create} Creating: ${date}`);
     baseLog.indent(`Time: ${workStartTime} → ${checkInTime} (${lateMinutes} mins = ${requiredHours.toFixed(2)}h)`);
   },

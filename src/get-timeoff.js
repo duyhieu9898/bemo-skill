@@ -44,7 +44,7 @@ function parseTimeOffRow(cells) {
  */
 function isLateTimeOff(record) {
   const { workStartTime } = CONFIG.rules;
-  // Extract hour from workStartTime (e.g., "08:15" -> "08")
+  // Extract hour from workStartTime (e.g., "08:00" -> "08")
   const startHour = workStartTime.split(":")[0];
   const endTimePattern = new RegExp(`${startHour}:\\d{2}`);
   
