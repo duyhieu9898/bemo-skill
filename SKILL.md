@@ -1,83 +1,65 @@
 ---
-name: bemo-time-off-automation
-description: Run Bemo Cloud attendance automation: sync attendance, find late check-ins, create/verify Time Off requests, and check in/out.
-deps:
-  - npm:dotenv
-  - npm:puppeteer-core
+name: Bemo Automation
+description: Automate Bemo attendance checkout, late attendance data sync, time-off creation, and verification.
 ---
 
-# Bemo Time Off Automation
+# Bemo Automation
 
-Use this skill for Bemo attendance, late check-ins, Time Off requests, and check-in/check-out.
+## Khi Nào Dùng
 
-Work from the skill directory:
+Dùng skill này khi user muốn thao tác với Bemo Cloud, bao gồm attendance, checkout, check-in/check-out, dữ liệu đi trễ, time-off request hoặc debug automation Bemo.
 
-```bash
-cd {baseDir}
-```
+## Khả Năng
 
-## First Action
+- Checkout attendance trên Bemo.
+- Đồng bộ dữ liệu attendance và time-off.
+- So sánh dữ liệu để tìm ngày đi trễ cần tạo time-off.
+- Tạo time-off request cho các record pending.
+- Verify time-off request đã tạo.
+- Debug log chạy Bemo automation.
 
-For "check late days", "sync attendance", "compare attendance", or similar requests, run:
+## Ngữ Cảnh Quan Trọng
 
-```bash
-npm run data:sync
-```
+- Đây là project Node.js.
+- Browser automation dùng `puppeteer-core`.
+- Cần Chrome/Chromium khả dụng trên máy.
+- Cần session Bemo đã login; nếu hết session cần login lại.
+- Một số thao tác có tác động thật lên Bemo, đặc biệt checkout và tạo time-off.
+- Command được phép chạy do agent quản lý ở `agent/commands.json`, không nằm trong file này.
 
-Then read `data/action-needed.json` if it exists and summarize:
+## File Liên Quan
 
-- number of pending Time Off records
-- affected dates
-- any command error
+- Package scripts: `{baseDir}/package.json`
+- Bemo config: `{baseDir}/src/config.js`
+- Login/session script: `{baseDir}/src/login.js`
+- Check-in/out logic: `{baseDir}/src/check-in-out.js`
+- Attendance sync: `{baseDir}/src/get-attendance.js`
+- Time-off sync: `{baseDir}/src/get-timeoff.js`
+- Compare logic: `{baseDir}/src/compare.js`
+- Time-off creation: `{baseDir}/src/create-timeoff.js`
+- Time-off verification: `{baseDir}/src/verify-timeoff.js`
+- Cron Telegram runner: `{baseDir}/scripts/run-cron-telegram.js`
+- Cron setup: `{baseDir}/scripts/setup-cron.sh`
 
-Do not create Time Off requests in this step.
+## Data Và Log
 
-## What The Commands Do
+- Pending records: `{baseDir}/data/action-needed.json`
+- Attendance data: `{baseDir}/data/attendance-data.json`
+- Time-off data: `{baseDir}/data/timeoff-data.json`
+- Human-readable log: `{baseDir}/logs/bemo.log`
+- Detailed create/debug log: `{baseDir}/logs/create-timeoff.json`
+- Cron runner log: `{baseDir}/logs/cron-run.log`
+- Cron service log: `{baseDir}/logs/cron.log`
 
-- `npm run data:sync`: runs attendance fetch, Time Off fetch, then compare.
-- `npm run auth`: refreshes the saved Bemo browser session.
-- `npm run off:fast`: creates pending Time Off requests quickly.
-- `npm run off:verify`: verifies created requests and cleans pending records.
-- `npm run off:create`: creates with per-record verification.
-- `npm run off:manual`: fills the form and lets the user click Save.
+## Biến Môi Trường
 
-Main output files:
+- `PUPPETEER_EXECUTABLE_PATH`: optional path tới Chrome/Chromium nếu auto-detect không hoạt động.
+- Bemo credential/session config nếu project yêu cầu trong `.env`.
 
-- `data/action-needed.json`: records that still need Time Off.
-- `logs/bemo.log`: readable run log.
-- `logs/create-timeoff.json`: detailed create/debug log.
+## Lưu Ý An Toàn
 
-## Creation Requires Approval
-
-Only after the user explicitly approves creating Time Off requests, run:
-
-```bash
-npm run off:fast
-npm run off:verify
-```
-
-Use `npm run off:create` only when the user asks for per-record verification. Use `npm run off:manual` only when the user wants to click Save manually.
-
-## Login
-
-Refresh login/session:
-
-```bash
-npm run auth
-```
-
-## Setup And Recovery
-
-If Chrome is missing, ask the user to set:
-
-```bash
-PUPPETEER_EXECUTABLE_PATH=/path/to/chrome
-```
-
-If data timestamps mismatch, rerun:
-
-```bash
-npm run data:sync
-```
-
-If creation/debugging fails, inspect `logs/bemo.log` and `logs/create-timeoff.json` only after the failed command.
+- Checkout là thao tác thật trên Bemo.
+- Tạo time-off là thao tác ghi dữ liệu thật.
+- Không tạo hoặc verify time-off nếu user chỉ yêu cầu xem dữ liệu.
+- Khi lỗi login/session, ưu tiên báo cần refresh login thay vì tự suy đoán dữ liệu sai.
+- Không in credential, cookie hoặc token từ `.env`/browser profile.

@@ -134,7 +134,7 @@ module.exports = {
   rules: {
     minLateMinutes: 7,
     maxLateMinutes: 60,
-    workStartTime: "08:15",
+    workStartTime: "08:00",
     defaultReason: "em xin phép đi trễ vì lý do cá nhân ạ",
   },
 

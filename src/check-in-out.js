@@ -10,8 +10,11 @@ const { login } = require("./login");
 /**
  * Perform Check In/Out action
  * @param {boolean} headless - Run in headless mode
+ * @param {object} options - Runtime options
+ * @param {boolean} options.checkoutOnly - Only click when the current action is Check out
  */
-async function checkInOut(headless = true) {
+async function checkInOut(headless = true, options = {}) {
+  const { checkoutOnly = false } = options;
   console.log(`🚀 Starting Check In/Out process...`);
 
   await withBrowser(CONFIG, headless, async (page, browser) => {
@@ -46,6 +49,11 @@ async function checkInOut(headless = true) {
 
     console.log(`🔍 Current action detected: ${status.label}`);
 
+    if (checkoutOnly && !isCheckoutAction(status)) {
+      console.log("ℹ️ Checkout-only mode: current action is not Check out, skipping click.");
+      return;
+    }
+
     // 4. Click the button
     await page.click(buttonSelector);
     console.log(`👆 Clicked ${status.label} button!`);
@@ -57,15 +65,31 @@ async function checkInOut(headless = true) {
   });
 }
 
+function isCheckoutAction(status) {
+  const text = `${status.label || ""} ${status.title || ""}`.toLowerCase();
+  return text.includes("check out") || text.includes("checkout");
+}
+
 // CLI entry point
 if (require.main === module) {
+  if (process.argv.includes("--help")) {
+    console.log(`Usage: node src/check-in-out.js [--checkout-only] [--show]
+
+Options:
+  --checkout-only  Only click when the current action is Check out
+  --show           Run with a visible browser
+  --help           Show this help message`);
+    process.exit(0);
+  }
+
   const show = process.argv.includes("--show");
+  const checkoutOnly = process.argv.includes("--checkout-only");
   const headless = !show;
 
-  checkInOut(headless).catch((err) => {
+  checkInOut(headless, { checkoutOnly }).catch((err) => {
     console.error("❌ Error:", err.message);
     process.exit(1);
   });
 }
 
-module.exports = { checkInOut };
+module.exports = { checkInOut, isCheckoutAction };

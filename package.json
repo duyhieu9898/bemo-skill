@@ -11,6 +11,9 @@
     "off:fast": "npm run off:create -- --fast",
     "off:manual": "npm run off:create -- --manual --show",
     "off:verify": "node src/verify-timeoff.js",
+    "checkout": "node src/check-in-out.js --checkout-only",
+    "checkout:show": "node src/check-in-out.js --checkout-only --show",
+    "checkout:telegram": "node scripts/run-cron-telegram.js",
     "run": "npm run data:sync && npm run off:fast && npm run off:verify",
     "run:show": "npm run data:sync && npm run off:fast -- --show && npm run off:verify"
   },
