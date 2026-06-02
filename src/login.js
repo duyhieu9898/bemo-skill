@@ -5,7 +5,7 @@
 
 const CONFIG = require("./config");
 const { createBrowser, closeBrowser, sleep, loginLogger: log, baseLog } = require("./utils");
-require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
+require("dotenv").config({ path: require("path").join(__dirname, "..", ".env"), quiet: true });
 
 const TIMEOUT = {
   navigation: 30000,

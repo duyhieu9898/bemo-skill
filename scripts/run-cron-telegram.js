@@ -3,15 +3,14 @@ const { exec } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 
-require("dotenv").config();
+require("dotenv").config({ quiet: true });
 
 const projectDir = path.resolve(__dirname, "..");
 const logDir = path.join(projectDir, "logs");
 const runLog = path.join(logDir, "cron-run.log");
 
-const telegramBotToken =
-  process.env.TELEGRAM_BOT_TOKEN || "8556741894:AAFn29duC9iBGJMn7sBndtdkWKFzwQaey3o";
-const telegramChatId = process.env.TELEGRAM_CHAT_ID || "811696951";
+const telegramBotToken = process.env.TELEGRAM_BOT_TOKEN;
+const telegramChatId = process.env.TELEGRAM_CHAT_ID;
 const jobCommand = process.env.JOB_COMMAND || "npm run checkout";
 
 if (process.argv.includes("--help")) {
@@ -28,6 +27,10 @@ Default command: npm run checkout`);
 }
 
 fs.mkdirSync(logDir, { recursive: true });
+
+if (!telegramBotToken || !telegramChatId) {
+  throw new Error("Missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID in environment");
+}
 
 function formatDate(date = new Date()) {
   return date.toLocaleString("sv-SE", {

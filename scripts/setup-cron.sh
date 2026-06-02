@@ -6,6 +6,7 @@ RUNNER="$PROJECT_DIR/scripts/run-cron-telegram.js"
 CRON_MARKER="bemo-automation-checkout"
 CRON_SCHEDULE="${CRON_SCHEDULE:-0 17 * * 1-5}"
 CRON_LOG="$PROJECT_DIR/logs/cron.log"
+NODE_BIN_DIR="$(dirname "$(command -v node)")"
 
 mkdir -p "$PROJECT_DIR/logs"
 chmod +x "$RUNNER"
@@ -15,7 +16,7 @@ if ! command -v crontab >/dev/null 2>&1; then
   exit 1
 fi
 
-CRON_LINE="${CRON_SCHEDULE} cd \"$PROJECT_DIR\" && P=\$(printf '\\045') && node \"$RUNNER\" 2>&1 | awk -v p=\"\$P\" '{ print \"[\" strftime(p \"Y-\" p \"m-\" p \"d \" p \"H:\" p \"M:\" p \"S\") \"] \" \$0; fflush(); }' >> \"$CRON_LOG\" # ${CRON_MARKER}"
+CRON_LINE="${CRON_SCHEDULE} export PATH=\"$NODE_BIN_DIR:/usr/local/bin:/usr/bin:/bin:\$PATH\"; cd \"$PROJECT_DIR\" && P=\$(printf '\\045') && node \"$RUNNER\" 2>&1 | awk -v p=\"\$P\" '{ print \"[\" strftime(p \"Y-\" p \"m-\" p \"d \" p \"H:\" p \"M:\" p \"S\") \"] \" \$0; fflush(); }' >> \"$CRON_LOG\" # ${CRON_MARKER}"
 CURRENT_CRON="$(mktemp)"
 NEW_CRON="$(mktemp)"
 
@@ -27,6 +28,6 @@ crontab "$NEW_CRON"
 rm -f "$CURRENT_CRON" "$NEW_CRON"
 
 printf 'Installed cron job:\n%s\n' "$CRON_LINE"
-printf '\nIt will run at 17:00, Monday through Friday, using the server timezone.\n'
+printf '\nSchedule: %s, using the server timezone.\n' "$CRON_SCHEDULE"
 printf 'Runner: %s\n' "$RUNNER"
 printf 'Cron log: %s\n' "$CRON_LOG"
