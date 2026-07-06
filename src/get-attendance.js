@@ -17,7 +17,8 @@ const {
 
 const OUTPUT_FILE = CONFIG.dataFiles.attendance;
 const { checkIn: CHECK_IN_COL, late: LATE_COL } = CONFIG.columns.attendance;
-const DEFAULT_MONTH_FILTER = "Current Month";
+const DEFAULT_MONTH_FILTER = CONFIG.attendanceFilters.default;
+
 
 /**
  * Parse attendance row cells to record
@@ -170,8 +171,8 @@ async function selectAttendanceMonthFilter(page, monthFilter = DEFAULT_MONTH_FIL
   const activeFacets = await getActiveSearchFacets(page);
   if (activeFacets.includes(monthFilter)) return;
 
-  if (activeFacets.includes("Current Month")) {
-    await removeSearchFacet(page, "Current Month");
+  if (activeFacets.includes(CONFIG.attendanceFilters.current)) {
+    await removeSearchFacet(page, CONFIG.attendanceFilters.current);
     await sleep(500);
   }
 
@@ -220,7 +221,7 @@ async function getAttendance(headless = true, monthFilter = DEFAULT_MONTH_FILTER
 // CLI entry point
 if (require.main === module) {
   const headless = !process.argv.includes("--show");
-  const monthFilter = process.argv.includes("--previous") ? "Previous Month" : DEFAULT_MONTH_FILTER;
+  const monthFilter = process.argv.includes("--previous") ? CONFIG.attendanceFilters.previous : DEFAULT_MONTH_FILTER;
   
   getAttendance(headless, monthFilter).catch((err) => {
     console.error("❌", err.message);

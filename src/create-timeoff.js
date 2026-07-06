@@ -250,7 +250,7 @@ async function createTimeOff(headless = true, manual = false, skipVerify = false
             updateActionFile([result.date]);
             log.removed(result.date);
           } else {
-            log.autoSaving();
+            log.savedWithoutVerify();
           }
         } else {
           log.skipped(record.date);

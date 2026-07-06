@@ -138,6 +138,13 @@ module.exports = {
     defaultReason: "em xin phép đi trễ vì lý do cá nhân ạ",
   },
 
+  // Attendance month filter options
+  attendanceFilters: {
+    current: "Current Month",
+    previous: "Previous Month",
+    default: "Current Month",
+  },
+
   // Launch options
   getLaunchOptions: (headless = false) => ({
     headless,

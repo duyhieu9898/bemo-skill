@@ -40,9 +40,14 @@ bemo/
 ## 🔧 Hướng dẫn sử dụng (Workflow)
 
 ### Bước 1: Chuẩn bị dữ liệu
-Luôn chạy bộ lệnh này trước để đảm bảo dữ liệu là mới nhất:
+Mặc định hệ thống sẽ đồng bộ dữ liệu của **tháng hiện tại (Current Month)**. Chạy lệnh:
 ```bash
 npm run data:sync
+```
+
+Nếu muốn đồng bộ dữ liệu của **tháng trước (Previous Month)**, bạn chạy lệnh:
+```bash
+node src/get-attendance.js --previous && node src/get-timeoff.js --previous && node src/compare.js
 ```
 *Kết quả: Danh sách ngày cần tạo đơn sẽ nằm trong `data/action-needed.json`.*
 

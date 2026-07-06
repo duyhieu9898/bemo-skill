@@ -185,6 +185,8 @@ const createTimeOffLogger = {
 
   autoSaving: () => baseLog.indent(`${ICONS.save} Auto-saving...`),
 
+  savedWithoutVerify: () => baseLog.indent(`${ICONS.success} Saved (skipped verification)`),
+
   skipping: (reason) => {
     baseLog.raw(`   ${ICONS.warning}  ${reason}`);
     baseLog.indent(`${ICONS.skip} Skipping this record...`);
