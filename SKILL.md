@@ -39,6 +39,7 @@ Dùng skill này khi user muốn thao tác với Bemo Cloud, bao gồm attendanc
 - Compare logic: `{baseDir}/src/compare.js`
 - Time-off creation: `{baseDir}/src/create-timeoff.js`
 - Time-off verification: `{baseDir}/src/verify-timeoff.js`
+- Late-day time-off workflow wrapper: `{baseDir}/src/workflows/late-timeoff.js`
 - Cron Telegram runner: `{baseDir}/scripts/run-cron-telegram.js`
 - Cron setup: `{baseDir}/scripts/setup-cron.sh`
 
@@ -61,6 +62,11 @@ Dùng skill này khi user muốn thao tác với Bemo Cloud, bao gồm attendanc
 
 - Checkout là thao tác thật trên Bemo.
 - Tạo time-off là thao tác ghi dữ liệu thật.
+- Qua Telegram, dùng `/bemo_late` để xem dữ liệu. Khi user muốn tạo time-off
+  và bỏ qua một số ngày, agent phải dùng command có cấu trúc
+  `bemo.prepare-timeoff` trước, rồi chỉ preview `bemo.create-timeoff`.
+- Không tạo time-off nếu chưa có plan JSON do `workflows/late-timeoff.js prepare` sinh
+  ra và confirmation `bemo.create-timeoff` hợp lệ.
 - Không tạo hoặc verify time-off nếu user chỉ yêu cầu xem dữ liệu.
 - Khi lỗi login/session, ưu tiên báo cần refresh login thay vì tự suy đoán dữ liệu sai.
 - Không in credential, cookie hoặc token từ `.env`/browser profile.

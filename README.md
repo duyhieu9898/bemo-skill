@@ -51,6 +51,29 @@ node src/get-attendance.js --previous && node src/get-timeoff.js --previous && n
 ```
 *Kết quả: Danh sách ngày cần tạo đơn sẽ nằm trong `data/action-needed.json`.*
 
+### Workflow an toàn qua Telegram
+
+```text
+/bemo_late
+tạo timeoff Bemo, bỏ ngày 2026-07-01 2026-07-02
+confirm bemo.create-timeoff <approval-token>
+```
+
+`/bemo_late` chỉ đọc dữ liệu. Yêu cầu natural-language tạo time-off sẽ khiến
+agent gọi command có cấu trúc `bemo.prepare-timeoff` để tạo plan JSON gồm ngày
+bị skip và ngày sẽ tạo, nhưng chưa gọi Bemo. Chỉ sau confirmation hợp lệ,
+`bemo.create-timeoff` nhận đúng plan đó qua JSON stdin; wrapper kiểm tra
+version, expiry, source digest, selected digest và chỉ chuyển các record đã chọn
+sang create engine.
+
+Các entrypoint workflow tương ứng trong package scripts:
+
+| Script | Mục đích |
+| :--- | :--- |
+| `npm run workflow:late:list` | In danh sách ngày đi trễ hiện tại, không ghi dữ liệu lên Bemo. |
+| `npm run workflow:timeoff:prepare` | Nhận JSON stdin `{ "skipDates": [...] }` và tạo plan có digest. |
+| `npm run workflow:timeoff:create` | Nhận plan đã được preview/confirm qua JSON stdin và tạo các đơn đã chọn. |
+
 ### Bước 2: Tạo đơn tự động
 Bạn có thể chọn chạy trọn gói (All-in-one) hoặc chạy theo từng chế độ riêng biệt.
 
@@ -71,7 +94,6 @@ Dành cho nhu cầu kiểm soát kỹ hơn từng đơn hoặc khi hệ thống 
 
 ### ⚙️ Lệnh bổ trợ khác
 - `npm run auth`: Đăng nhập lại nếu bị hết hạn session.
-- `npm run data:clean`: Xóa sạch dữ liệu tạm trong thư mục `data/`.
 
 ## 🔒 Cơ chế bảo vệ & Logic nghiệp vụ
 

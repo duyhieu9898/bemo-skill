@@ -97,7 +97,7 @@ function updateActionFile(processedDates) {
  * @returns {Promise<Object|null>} Created record or null if skipped
  */
 async function createOne(page, record, manual = false, skipVerify = false) {
-  const { date, checkInDateTime, lateMinutes, reason: recordReason } = record;
+  const { date, canonicalDate, checkInDateTime, lateMinutes, reason: recordReason } = record;
   const checkInTime = extractTimeFromDateTime(checkInDateTime);
   const requiredHours = lateMinutes / 60;
 
@@ -208,7 +208,7 @@ async function createOne(page, record, manual = false, skipVerify = false) {
     sessionLeaveTypes = updateSessionLeaveCache(sessionLeaveTypes, usedLeaveType.name, lateMinutes);
   }
 
-  return { date, start: startDateTime, end: endDateTime, reason };
+  return { date, canonicalDate, start: startDateTime, end: endDateTime, reason };
 }
 
 /**
@@ -216,21 +216,22 @@ async function createOne(page, record, manual = false, skipVerify = false) {
  * @param {boolean} headless - Run in headless mode
  * @param {boolean} manual - Manual mode (user clicks save)
  * @param {boolean} skipVerify - Skip per-record verification
- * @returns {Promise<void>}
+ * @param {Array<Object>|null} selectedRecords - Explicit approved records, or null to use action-needed.json
+ * @returns {Promise<Object>} Structured creation summary
  */
-async function createTimeOff(headless = true, manual = false, skipVerify = false) {
-  const actionData = loadJSON(ACTION_FILE);
+async function createTimeOff(headless = true, manual = false, skipVerify = false, selectedRecords = null) {
+  const actionData = selectedRecords === null ? loadJSON(ACTION_FILE) : null;
 
-  if (!actionData) {
+  if (selectedRecords === null && !actionData) {
     log.missingFile(ACTION_FILE);
-    return;
+    return { created: [], failed: [], skipped: [] };
   }
 
-  const records = actionData.records || [];
+  const records = selectedRecords === null ? actionData.records || [] : selectedRecords;
 
   if (records.length === 0) {
     log.nothingToCreate();
-    return;
+    return { created: [], failed: [], skipped: [] };
   }
 
   log.modeInfo(records.length, manual);
@@ -270,6 +271,12 @@ async function createTimeOff(headless = true, manual = false, skipVerify = false
     failed: failed.length,
     skipped: skipped.length,
   });
+
+  return {
+    created,
+    failed: failed.map(({ record, error }) => ({ date: record.date, error })),
+    skipped: skipped.map((record) => ({ date: record.date })),
+  };
 }
 
 // CLI entry point
