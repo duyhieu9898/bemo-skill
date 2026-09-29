@@ -97,3 +97,21 @@ test("executePlan refuses a tampered plan without calling create", async () => {
   );
   assert.equal(called, false);
 });
+
+test("executePlan reports saved-but-unverified dates separately from failures", async () => {
+  const plan = buildPlan(actionData, [], options);
+
+  const result = await executePlan(plan, actionData, {
+    now: new Date("2026-07-06T08:01:00.000Z"),
+    create: async (_headless, _manual, _skipVerify, records) => ({
+      created: records.slice(1),
+      unverified: records.slice(0, 1),
+      failed: [],
+      skipped: [],
+    }),
+  });
+
+  assert.deepEqual(result.unverifiedDates, ["2026-07-01"]);
+  assert.deepEqual(result.createdDates, ["2026-07-02", "2026-07-03"]);
+  assert.deepEqual(result.failed, []);
+});

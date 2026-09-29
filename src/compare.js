@@ -4,10 +4,13 @@
  */
 
 const CONFIG = require("./config");
+const BUSINESS = require("./business-rules");
 const { loadJSON, saveJSON, createDataWrapper, extractDateFromDateTime, compareLogger: log } = require("./utils");
 
 const { attendance, timeoff, actionNeeded } = CONFIG.dataFiles;
-const { minLateMinutes, maxLateMinutes, defaultReason } = CONFIG.rules;
+const {
+  lateArrival: { minMinutes: minLateMinutes, maxMinutes: maxLateMinutes, defaultReason },
+} = BUSINESS;
 
 /**
  * Check if two timestamps are from the same hour

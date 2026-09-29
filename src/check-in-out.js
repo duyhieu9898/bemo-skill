@@ -4,31 +4,38 @@
  */
 
 const CONFIG = require("./config");
-const { withBrowser, navigateWithAuth, sleep } = require("./utils");
+const { withBrowser, navigateWithAuth } = require("./utils");
 const { login } = require("./login");
 
+const ATTENDANCE_RPC = "/web/dataset/call_kw/hr.employee/attendance_manual";
+// Bemo reads geolocation before sending the RPC, so allow more than a plain request.
+const ATTENDANCE_RPC_TIMEOUT = 30000;
+
 /**
- * Perform Check In/Out action
+ * Perform Check In/Out action, logging in once and retrying if the session expired
  * @param {boolean} headless - Run in headless mode
  * @param {object} options - Runtime options
  * @param {boolean} options.checkoutOnly - Only click when the current action is Check out
  */
 async function checkInOut(headless = true, options = {}) {
-  const { checkoutOnly = false } = options;
   console.log(`🚀 Starting Check In/Out process...`);
 
-  await withBrowser(CONFIG, headless, async (page, browser) => {
+  try {
+    await runCheckInOut(headless, options);
+  } catch (err) {
+    if (err.code !== "BEMO_NOT_LOGGED_IN") throw err;
+    // login() opens its own browser on the same profile, so it must run after this one is closed.
+    console.log("⚠️ Not logged in, attempting auto-login...");
+    await login();
+    await runCheckInOut(headless, options);
+  }
+}
+
+async function runCheckInOut(headless, { checkoutOnly = false }) {
+  await withBrowser(CONFIG, headless, async (page) => {
     // 1. Navigate to Check In/Out page
     console.log(`📍 Navigating to: ${CONFIG.urls.checkInOut}`);
-
-    // Attempt navigation, if it fails due to auth, login
-    try {
-      await navigateWithAuth(page, CONFIG.urls.checkInOut);
-    } catch (e) {
-      console.log("⚠️ Not logged in, attempting auto-login...");
-      await login();
-      await navigateWithAuth(page, CONFIG.urls.checkInOut);
-    }
+    await navigateWithAuth(page, CONFIG.urls.checkInOut);
 
     // 2. Wait for the button to appear
     const buttonSelector = ".o_hr_attendance_sign_in_out_icon";
@@ -54,12 +61,26 @@ async function checkInOut(headless = true, options = {}) {
       return;
     }
 
-    // 4. Click the button
+    // 4. Click the button and wait for Odoo's answer instead of assuming success
+    const response = page.waitForResponse((res) => res.url().includes(ATTENDANCE_RPC), {
+      timeout: ATTENDANCE_RPC_TIMEOUT,
+    });
+    response.catch(() => {});
     await page.click(buttonSelector);
     console.log(`👆 Clicked ${status.label} button!`);
 
-    // 5. Wait a bit for the action to register
-    await sleep(2000);
+    let body;
+    try {
+      body = await (await response).json();
+    } catch (err) {
+      throw new Error(`${status.label} not confirmed: no attendance response from Bemo (${err.message})`);
+    }
+
+    // 5. Odoo returns { result: { action } } on success, { result: { warning } } or { error } otherwise
+    const failure = body.error?.data?.message || body.error?.message || body.result?.warning;
+    if (failure || !body.result?.action) {
+      throw new Error(`${status.label} rejected by Bemo: ${failure || "unexpected response"}`);
+    }
 
     console.log(`✅ ${status.label} completed successfully!`);
   });

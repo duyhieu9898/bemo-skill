@@ -32,10 +32,18 @@ async function login() {
   const page = await browser.newPage();
 
   try {
-    await page.goto(CONFIG.urls.login, {
+    // Check the session first: when already logged in, Bemo's login page shows a blocking
+    // "validateLogged" modal and the form cannot be submitted. /web redirects to /login only without a session.
+    await page.goto(CONFIG.urls.login.replace(/\/web\/login$/, "/web"), {
       waitUntil: "networkidle2",
       timeout: TIMEOUT.navigation,
     });
+
+    if (!isOnLoginPage(page)) {
+      log.alreadyLoggedIn();
+      await closeBrowser(browser);
+      return;
+    }
 
     const bemoUser = process.env.BEMO_USER || process.env.BEMO_EMAIL;
     const bemoPass = process.env.BEMO_PASS || process.env.BEMO_PASSWORD;
@@ -45,8 +53,11 @@ async function login() {
       await page.waitForSelector('input[name="login"]', { timeout: 10000 });
       await page.type('input[name="login"]', bemoUser);
       await page.type('input[name="password"]', bemoPass);
-      await page.click('button[type="submit"]');
-      await sleep(10000);
+      // Submitting always navigates (to /web on success, back to /login on bad credentials).
+      await Promise.all([
+        page.waitForNavigation({ waitUntil: "networkidle2", timeout: TIMEOUT.navigation }),
+        page.click('button[type="submit"]'),
+      ]);
     }
 
     if (!isOnLoginPage(page)) {

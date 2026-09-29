@@ -7,13 +7,15 @@ const CONFIG = require("./config");
 const {
   withBrowser,
   navigateWithAuth,
-  sleep,
+  withListReload,
   saveJSON,
   createDataWrapper,
   parseTimeToMinutes,
   extractDateFromDateTime,
   dataLogger,
 } = require("./utils");
+const { connect } = require("./rpc/client");
+const { fetchAttendance } = require("./rpc/sync");
 
 const OUTPUT_FILE = CONFIG.dataFiles.attendance;
 const { checkIn: CHECK_IN_COL, late: LATE_COL } = CONFIG.columns.attendance;
@@ -172,8 +174,7 @@ async function selectAttendanceMonthFilter(page, monthFilter = DEFAULT_MONTH_FIL
   if (activeFacets.includes(monthFilter)) return;
 
   if (activeFacets.includes(CONFIG.attendanceFilters.current)) {
-    await removeSearchFacet(page, CONFIG.attendanceFilters.current);
-    await sleep(500);
+    await withListReload(page, () => removeSearchFacet(page, CONFIG.attendanceFilters.current));
   }
 
   const opened = await openSearchFilterMenu(page);
@@ -181,14 +182,20 @@ async function selectAttendanceMonthFilter(page, monthFilter = DEFAULT_MONTH_FIL
     throw new Error("Could not open attendance search filter menu");
   }
 
-  await sleep(500);
-
-  const clicked = await clickFilterMenuItem(page, monthFilter);
-  if (!clicked) {
-    throw new Error(`Could not select attendance filter: ${monthFilter}`);
+  // Wait for the dropdown item instead of a fixed delay, then click it and wait for the reloaded rows.
+  try {
+    await page.waitForFunction(
+      (label) =>
+        Array.from(document.querySelectorAll(".dropdown-menu a, .dropdown-menu button, .dropdown-menu label, .o_search_options a, .o_search_options button, .o_search_options label"))
+          .some((el) => el.offsetParent && el.textContent.replace(/\s+/g, " ").trim().toLowerCase() === label.toLowerCase()),
+      { timeout: 5000 },
+      monthFilter,
+    );
+  } catch {
+    throw new Error(`Could not find attendance filter: ${monthFilter}`);
   }
 
-  await sleep(2000);
+  await withListReload(page, () => clickFilterMenuItem(page, monthFilter));
 
   const updatedFacets = await getActiveSearchFacets(page);
   if (!updatedFacets.includes(monthFilter)) {
@@ -197,25 +204,42 @@ async function selectAttendanceMonthFilter(page, monthFilter = DEFAULT_MONTH_FIL
 }
 
 /**
+ * Read attendance by scraping the list view (fallback engine)
+ */
+async function readAttendanceFromBrowser(headless, monthFilter) {
+  return withBrowser(CONFIG, headless, async (page) => {
+    await navigateWithAuth(page, CONFIG.urls.attendances, { waitForList: true });
+    await selectAttendanceMonthFilter(page, monthFilter);
+    return extractAttendanceRecords(page);
+  });
+}
+
+/**
+ * Read attendance through Odoo JSON-RPC (default engine)
+ */
+async function readAttendanceFromApi(monthFilter) {
+  const now = new Date();
+  const offset = monthFilter === CONFIG.attendanceFilters.previous ? -1 : 0;
+  const conn = await connect();
+  return fetchAttendance(conn, { year: now.getFullYear(), monthIndex: now.getMonth() + offset });
+}
+
+/**
  * Main function to get attendance records
- * @param {boolean} headless - Run in headless mode
+ * @param {boolean} headless - Run in headless mode (browser engine only)
  * @param {string} monthFilter - Odoo attendance month filter label
+ * @param {Object} options - Options
+ * @param {"api"|"browser"} [options.engine="api"] - Data source
  * @returns {Promise<Array>} Processed records
  */
-async function getAttendance(headless = true, monthFilter = DEFAULT_MONTH_FILTER) {
-  return withBrowser(CONFIG, headless, async (page) => {
-    await navigateWithAuth(page, CONFIG.urls.attendances);
-    await selectAttendanceMonthFilter(page, monthFilter);
+async function getAttendance(headless = true, monthFilter = DEFAULT_MONTH_FILTER, { engine = "api" } = {}) {
+  const records =
+    engine === "browser" ? await readAttendanceFromBrowser(headless, monthFilter) : await readAttendanceFromApi(monthFilter);
 
-    const records = await extractAttendanceRecords(page);
+  saveJSON(OUTPUT_FILE, createDataWrapper(records));
+  dataLogger.saved(records.length, "data/attendance-data.json");
 
-    const data = createDataWrapper(records);
-    saveJSON(OUTPUT_FILE, data);
-
-    dataLogger.saved(records.length, "data/attendance-data.json");
-
-    return records;
-  });
+  return records;
 }
 
 // CLI entry point
@@ -223,7 +247,9 @@ if (require.main === module) {
   const headless = !process.argv.includes("--show");
   const monthFilter = process.argv.includes("--previous") ? CONFIG.attendanceFilters.previous : DEFAULT_MONTH_FILTER;
   
-  getAttendance(headless, monthFilter).catch((err) => {
+  const engine = process.argv.includes("--browser") ? "browser" : "api";
+
+  getAttendance(headless, monthFilter, { engine }).catch((err) => {
     console.error("❌", err.message);
     process.exit(1);
   });

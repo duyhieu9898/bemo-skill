@@ -5,12 +5,12 @@
  */
 
 const CONFIG = require("./config");
+const BUSINESS = require("./business-rules");
 const {
   withBrowser,
   sleep,
   clickButtonByText,
   loadJSON,
-  loadRecords,
   saveJSON,
   createDataWrapper,
   extractTimeFromDateTime,
@@ -22,6 +22,9 @@ const {
 const { getLeaveTypes, selectLeaveType, verifyTimeOffExists } = require("./timeoff/ui");
 const { fillTimeOffForm, validateDuration } = require("./timeoff/form");
 const { findSuitableLeaveType, updateSessionLeaveCache } = require("./timeoff/logic");
+const { removeFromActionFile } = require("./timeoff/action-file");
+const { checkLateRequest, checkRun, assertSafe } = require("./timeoff/safety");
+const { createTimeOffViaApi } = require("./rpc/create-leave");
 
 /**
  * Wrapper for debug logging in this module
@@ -39,6 +42,7 @@ let sessionLeaveTypes = null;
 // Timing constants
 const TIMING = {
   manualSave: 120000,
+  saveDialogClose: 15000,
 };
 
 /**
@@ -66,26 +70,15 @@ async function checkLeaveBalance(page, requiredMinutes, forceRefresh = false) {
   const suitableType = findSuitableLeaveType(sessionLeaveTypes, requiredHours);
 
   // Use UI module to select it
-  await selectLeaveType(page, suitableType.name);
+  const selected = await selectLeaveType(page, suitableType.name);
+  if (!selected) {
+    const err = new Error(`Could not select leave type "${suitableType.name}" in the form`);
+    err.selectionFailed = true;
+    throw err;
+  }
   log.selectedType(suitableType);
 
   return suitableType;
-}
-
-/**
- * Update action-needed.json to remove processed records
- * @param {Array<string>} processedDates - Dates that were successfully processed
- */
-function updateActionFile(processedDates) {
-  const records = loadRecords(ACTION_FILE);
-  const remaining = records.filter((r) => !processedDates.includes(r.date));
-
-  const data = createDataWrapper(remaining, { count: remaining.length });
-  saveJSON(ACTION_FILE, data);
-
-  if (remaining.length > 0) {
-    log.durationWarning(`${remaining.length} records remaining in action-needed.json`);
-  }
 }
 
 /**
@@ -101,7 +94,7 @@ async function createOne(page, record, manual = false, skipVerify = false) {
   const checkInTime = extractTimeFromDateTime(checkInDateTime);
   const requiredHours = lateMinutes / 60;
 
-  log.createStart(date, checkInTime, lateMinutes, requiredHours, CONFIG.rules.workStartTime);
+  log.createStart(date, checkInTime, lateMinutes, requiredHours, BUSINESS.workSchedule.start);
   debugLog("createOne_start", { date, lateMinutes, requiredHours, skipVerify });
 
   // Navigate to create page
@@ -128,15 +121,17 @@ async function createOne(page, record, manual = false, skipVerify = false) {
   try {
     usedLeaveType = await checkLeaveBalance(page, lateMinutes);
   } catch (err) {
+    // A UI selection failure is a real failure, not a balance skip.
+    if (err.selectionFailed) throw err;
     debugLog("createOne_skipping", { date, error: err.message });
     log.skipping(err.message);
     return null;
   }
 
   // Prepare form data
-  const startDateTime = `${date} ${CONFIG.rules.workStartTime}:00`;
+  const startDateTime = `${date} ${BUSINESS.workSchedule.start}:00`;
   const endDateTime = `${date} ${checkInTime}:00`;
-  const reason = recordReason || CONFIG.rules.defaultReason;
+  const reason = recordReason || BUSINESS.lateArrival.defaultReason;
 
   // Fill form
   const fillResult = await fillTimeOffForm(page, startDateTime, endDateTime, reason);
@@ -147,7 +142,7 @@ async function createOne(page, record, manual = false, skipVerify = false) {
   }
 
   // Validate duration
-  const maxAllowedMinutes = Math.max(CONFIG.rules.maxLateMinutes, lateMinutes);
+  const maxAllowedMinutes = Math.max(BUSINESS.lateArrival.maxMinutes, lateMinutes);
   const durationValidation = await validateDuration(page, lateMinutes, maxAllowedMinutes);
 
   if (!durationValidation.found) {
@@ -155,7 +150,7 @@ async function createOne(page, record, manual = false, skipVerify = false) {
   } else if (!durationValidation.isValid) {
     const errors = [];
     if (!durationValidation.isUnderMax) {
-      errors.push(`Duration ${durationValidation.actualMinutes} mins > ${CONFIG.rules.maxLateMinutes} mins limit`);
+      errors.push(`Duration ${durationValidation.actualMinutes} mins > ${BUSINESS.lateArrival.maxMinutes} mins limit`);
     }
     if (!durationValidation.matchesExpected) {
       errors.push(`Expected ${lateMinutes} mins but got ${durationValidation.actualMinutes} mins`);
@@ -178,38 +173,58 @@ async function createOne(page, record, manual = false, skipVerify = false) {
     throw new Error(`Form date mismatch: Expected ${date}, got start="${formValues.startValue}", end="${formValues.endValue}"`);
   }
 
+  // Hard safety rules on what the form will save (the browser cannot see other leaves that day).
+  assertSafe(checkLateRequest({ date, start: formValues.startValue, end: formValues.endValue, lateMinutes }), date);
+
   // Save
+  let verified = false;
   if (manual) {
     log.manualMode();
     await sleep(TIMING.manualSave);
   } else {
     log.autoSaving();
     await clickButtonByText(page, "save");
-    
-    try {
-      await page.waitForFunction(() => !document.querySelector("button.o_form_button_save"), { timeout: 10000 });
-    } catch (err) {
-      debugLog("autoSave_timeout", { message: "Save button still present after 10s" });
+    await waitForSaveDialogClosed(page);
+
+    // The dialog closed, so Bemo accepted the record: consume the balance even if verification lags.
+    if (usedLeaveType) {
+      sessionLeaveTypes = updateSessionLeaveCache(sessionLeaveTypes, usedLeaveType.name, lateMinutes);
     }
 
     if (!skipVerify) {
       log.verifying();
-      const exists = await verifyTimeOffExists(page, date, CONFIG.urls.timeoffList);
-      if (!exists) {
-        throw new Error(`Verification failed: Time off for ${date} not found in list after save`);
-      }
-      log.verified();
-    } else {
-      await sleep(1000);
+      verified = await verifyTimeOffExists(page, date, CONFIG.urls.timeoffList, {
+        startTime: BUSINESS.workSchedule.start,
+      });
+      if (verified) log.verified();
+      else log.unverified(date);
     }
   }
 
-  // Update memory cache after success
-  if (!manual && usedLeaveType) {
-    sessionLeaveTypes = updateSessionLeaveCache(sessionLeaveTypes, usedLeaveType.name, lateMinutes);
-  }
+  return { date, canonicalDate, start: startDateTime, end: endDateTime, reason, verified };
+}
 
-  return { date, canonicalDate, start: startDateTime, end: endDateTime, reason };
+/**
+ * Wait until the time off form dialog closes after clicking Save.
+ * The form opens as a modal from the calendar view, so a closed modal means Odoo accepted the record.
+ * @param {Page} page - Puppeteer page
+ * @throws {Error} If the dialog is still open (validation error or save hang)
+ */
+async function waitForSaveDialogClosed(page) {
+  try {
+    await page.waitForFunction(() => !document.querySelector(".modal .o_form_view"), {
+      timeout: TIMING.saveDialogClose,
+    });
+  } catch (err) {
+    const dialogText = await page.evaluate(() =>
+      Array.from(document.querySelectorAll(".modal .modal-body"))
+        .map((el) => el.innerText.trim())
+        .filter(Boolean)
+        .pop() || "",
+    );
+    debugLog("autoSave_dialog_still_open", { dialogText: dialogText.slice(0, 500) });
+    throw new Error(`Save did not complete, dialog still open: ${dialogText.slice(0, 200) || "no message"}`);
+  }
 }
 
 /**
@@ -218,27 +233,40 @@ async function createOne(page, record, manual = false, skipVerify = false) {
  * @param {boolean} manual - Manual mode (user clicks save)
  * @param {boolean} skipVerify - Skip per-record verification
  * @param {Array<Object>|null} selectedRecords - Explicit approved records, or null to use action-needed.json
+ * @param {Object} options - Options
+ * @param {"api"|"browser"} [options.engine] - "api" (default) or "browser"; manual mode always uses the browser
+ * @param {boolean} [options.dryRun=false] - API engine only: fill and validate without creating
  * @returns {Promise<Object>} Structured creation summary
  */
-async function createTimeOff(headless = true, manual = false, skipVerify = false, selectedRecords = null) {
+async function createTimeOff(headless = true, manual = false, skipVerify = false, selectedRecords = null, options = {}) {
+  const { engine = manual ? "browser" : "api", dryRun = false } = options;
   const actionData = selectedRecords === null ? loadJSON(ACTION_FILE) : null;
 
   if (selectedRecords === null && !actionData) {
     log.missingFile(ACTION_FILE);
-    return { created: [], failed: [], skipped: [] };
+    return { created: [], unverified: [], failed: [], skipped: [] };
   }
 
   const records = selectedRecords === null ? actionData.records || [] : selectedRecords;
 
   if (records.length === 0) {
     log.nothingToCreate();
-    return { created: [], failed: [], skipped: [] };
+    return { created: [], unverified: [], failed: [], skipped: [] };
   }
+
+  assertSafe(checkRun(records), "run");
+
+  if (engine === "api") {
+    if (manual) throw new Error("Manual mode needs the browser engine");
+    return createTimeOffViaApi(records, { dryRun });
+  }
+  if (dryRun) throw new Error("--dry-run is only supported by the API engine");
 
   log.modeInfo(records.length, manual);
   debugLog("createTimeOff_run_start", { recordCount: records.length, manual, skipVerify });
 
   const created = [];
+  const unverified = [];
   const failed = [];
   const skipped = [];
 
@@ -246,14 +274,14 @@ async function createTimeOff(headless = true, manual = false, skipVerify = false
     for (const record of records) {
       try {
         const result = await createOne(page, record, manual, skipVerify);
-        if (result) {
+        if (result?.verified) {
           created.push(result);
-          if (!skipVerify) {
-            updateActionFile([result.date]);
-            log.removed(result.date);
-          } else {
-            log.savedWithoutVerify();
-          }
+          removeFromActionFile([result.date]);
+          log.removed(result.date);
+        } else if (result) {
+          // Saved but not verified: keep it in action-needed.json; run sync/verify before retrying.
+          unverified.push(result);
+          if (skipVerify) log.savedWithoutVerify();
         } else {
           log.skipped(record.date);
           skipped.push(record);
@@ -262,19 +290,20 @@ async function createTimeOff(headless = true, manual = false, skipVerify = false
         log.failed(err.message);
         failed.push({ record, error: err.message });
       }
-      await sleep(1000);
     }
   });
 
-  log.summary(created.length, failed.length, skipped.length);
+  log.summary(created.length, failed.length, skipped.length, unverified.length);
   debugLog("createTimeOff_run_end", {
     created: created.length,
+    unverified: unverified.length,
     failed: failed.length,
     skipped: skipped.length,
   });
 
   return {
     created,
+    unverified,
     failed: failed.map(({ record, error }) => ({ date: record.date, error })),
     skipped: skipped.map((record) => ({ date: record.date })),
   };
@@ -286,8 +315,10 @@ if (require.main === module) {
   const show = process.argv.includes("--show");
   const skipVerify = process.argv.includes("--skip-verify") || process.argv.includes("--fast");
   const headless = !show && !manual;
-  
-  createTimeOff(headless, manual, skipVerify).catch((err) => {
+  const engine = manual || process.argv.includes("--browser") ? "browser" : "api";
+  const dryRun = process.argv.includes("--dry-run");
+
+  createTimeOff(headless, manual, skipVerify, null, { engine, dryRun }).catch((err) => {
     console.error("❌", err.message);
     process.exit(1);
   });

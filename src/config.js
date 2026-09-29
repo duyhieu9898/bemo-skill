@@ -130,14 +130,6 @@ module.exports = {
     checkInOut: `${BASE_URL}/web#action=267&cids=&menu_id=192`,
   },
 
-  // Business rules
-  rules: {
-    minLateMinutes: 7,
-    maxLateMinutes: 60,
-    workStartTime: "08:00",
-    defaultReason: "em xin phép đi trễ vì lý do cá nhân ạ",
-  },
-
   // Attendance month filter options
   attendanceFilters: {
     current: "Current Month",

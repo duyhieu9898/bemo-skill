@@ -3,6 +3,7 @@
 const crypto = require("node:crypto");
 
 const CONFIG = require("../config");
+const BUSINESS = require("../business-rules");
 const { createTimeOff } = require("../create-timeoff");
 const { loadJSON } = require("../utils");
 
@@ -41,7 +42,7 @@ function normalizeRecord(record) {
     canonicalDate,
     checkInDateTime: record.checkInDateTime,
     lateMinutes: record.lateMinutes,
-    reason: typeof record.reason === "string" ? record.reason : CONFIG.rules.defaultReason,
+    reason: typeof record.reason === "string" ? record.reason : BUSINESS.lateArrival.defaultReason,
   };
 }
 
@@ -130,6 +131,7 @@ async function executePlan(plan, actionData, options = {}) {
     skippedDates: validated.skippedDates,
     selectedDates: validated.createDates,
     createdDates: summary.created.map((record) => normalizeDate(record.canonicalDate || record.date)),
+    unverifiedDates: (summary.unverified || []).map((record) => normalizeDate(record.canonicalDate || record.date)),
     failed: summary.failed.map((item) => ({ ...item, date: normalizeDate(item.date) })),
     skipped: summary.skipped.map((item) => ({ ...item, date: normalizeDate(item.date) })),
   };
@@ -162,6 +164,11 @@ async function main() {
     const plan = await readStdinJson();
     const result = await executePlan(plan, actionData);
     process.stdout.write(`BEMO_WORKFLOW_RESULT=${JSON.stringify(result)}\n`);
+    if (result.unverifiedDates.length) {
+      console.error(
+        `Saved but unverified: ${result.unverifiedDates.join(", ")}. Run data:sync before retrying to avoid duplicates.`,
+      );
+    }
     if (result.failed.length) throw new Error(`${result.failed.length} selected time-off request(s) failed.`);
     return;
   }

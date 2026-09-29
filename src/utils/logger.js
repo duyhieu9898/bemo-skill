@@ -198,8 +198,11 @@ const createTimeOffLogger = {
 
   failed: (msg) => baseLog.raw(`   ${ICONS.error} Failed: ${msg}`),
 
-  summary: (created, failed, skipped = 0) => {
+  summary: (created, failed, skipped = 0, unverified = 0) => {
     baseLog.raw(`\n${ICONS.success} Created: ${created}`);
+    if (unverified > 0) {
+      baseLog.raw(`${ICONS.warning} Saved but unverified: ${unverified} (run data:sync before retrying)`);
+    }
     if (skipped > 0) baseLog.raw(`${ICONS.skip} Skipped: ${skipped}`);
     if (failed > 0) baseLog.raw(`${ICONS.error} Failed: ${failed}`);
   },
@@ -219,7 +222,12 @@ const createTimeOffLogger = {
   verifying: () => baseLog.indent("🔍 Verifying time off was created..."),
   
   verified: () => baseLog.indent(`${ICONS.success} Verified: Time off exists in system`),
+
+  unverified: (date) =>
+    baseLog.indent(`${ICONS.warning} Saved, but ${date} not visible in list yet. Do NOT recreate; run data:sync to confirm.`),
   
+  alreadyExists: (date) => baseLog.indent(`${ICONS.skip} ${date} already has an active time off in that range, not creating another`),
+
   removed: (date) => baseLog.indent(`${ICONS.success} Removed ${date} from action-needed.json`),
 
   selectionWarning: (msg) => baseLog.raw(`   ${ICONS.warning}  ${msg}`),
@@ -231,7 +239,9 @@ const createTimeOffLogger = {
 const dataLogger = {
   saved: (count, filename) => baseLog.success(`Saved ${count} records to ${filename}`),
   notLoggedIn: () => {
-    throw new Error("Not logged in. Run: node login.js --show");
+    const err = new Error("Not logged in to Bemo. Run: npm run auth");
+    err.code = "BEMO_NOT_LOGGED_IN";
+    throw err;
   },
   genericError: (msg) => baseLog.error(msg),
 };

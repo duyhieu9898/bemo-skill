@@ -2,7 +2,8 @@
  * Logic & Balancing helpers for Time Off creation
  */
 
-const { saveJSON, createDataWrapper, createTimeOffLogger: log, debugLog } = require("../utils");
+const BUSINESS = require("../business-rules");
+const { debugLog } = require("../utils");
 
 /**
  * Extract year from leave type name
@@ -15,32 +16,33 @@ function extractYearFromLeaveType(name) {
 }
 
 /**
- * Filter and sort only Annual Leave types, prioritizes older years first
- * @param {Array} allLeaveTypes - All available types
+ * Pick the leave type to use, following BUSINESS.leaveTypePriority:
+ * the first priority entry with a matching type that has enough balance wins;
+ * within one entry, older years are used first.
+ * @param {Array} allLeaveTypes - Available types ({name, remaining})
  * @param {number} requiredHours - Required hours
+ * @param {Array<string>} priority - Name fragments in priority order
  * @returns {Object} Selected leave type
  */
-function findSuitableLeaveType(allLeaveTypes, requiredHours) {
-  // Filter only Annual Leave types
-  const annualLeaveTypes = allLeaveTypes.filter((t) => t.name.toLowerCase().includes("annual leave"));
+function findSuitableLeaveType(allLeaveTypes, requiredHours, priority = BUSINESS.leaveTypePriority) {
+  const byPriority = priority.map((fragment) =>
+    allLeaveTypes
+      .filter((t) => t.name.toLowerCase().includes(fragment.toLowerCase()))
+      .sort((a, b) => extractYearFromLeaveType(a.name) - extractYearFromLeaveType(b.name)),
+  );
+  const candidates = byPriority.flat();
 
-  if (annualLeaveTypes.length === 0) {
-    throw new Error("No Annual Leave types found in dropdown");
+  if (candidates.length === 0) {
+    throw new Error(`No leave types matching priority list: ${priority.join(", ")}`);
   }
 
-  // Sort by year ascending (older years first)
-  const sortedByYear = annualLeaveTypes.sort((a, b) => {
-    const yearA = extractYearFromLeaveType(a.name);
-    const yearB = extractYearFromLeaveType(b.name);
-    return yearA - yearB;
-  });
-
-  // Find first suitable type with enough balance
-  const suitableType = sortedByYear.find((t) => t.remaining >= requiredHours);
+  const suitableType = candidates.find((t) => t.remaining >= requiredHours);
 
   if (!suitableType) {
-    const maxAvailable = annualLeaveTypes.length > 0 ? Math.max(...annualLeaveTypes.map((t) => t.remaining)) : 0;
-    throw new Error(`Insufficient Annual Leave balance. Required: ${requiredHours}h, Max available: ${maxAvailable}h`);
+    const maxAvailable = Math.max(...candidates.map((t) => t.remaining));
+    throw new Error(
+      `Insufficient balance in ${priority.join(", ")}. Required: ${requiredHours}h, Max available: ${maxAvailable}h`,
+    );
   }
 
   return suitableType;
@@ -56,21 +58,20 @@ function findSuitableLeaveType(allLeaveTypes, requiredHours) {
 function updateSessionLeaveCache(cache, typeName, usedMinutes) {
   if (!cache) return null;
   
-  const updatedCache = [...cache];
   const usedHours = usedMinutes / 60;
-  const typeIndex = updatedCache.findIndex(t => t.name === typeName);
-  
-  if (typeIndex !== -1) {
-    updatedCache[typeIndex].remaining -= usedHours;
-    // Ensure it doesn't go below 0 due to rounding
-    if (updatedCache[typeIndex].remaining < 0) updatedCache[typeIndex].remaining = 0;
-    
-    debugLog("create-timeoff.json", "updated_session_cache", { 
-      type: typeName, 
-      newBalance: updatedCache[typeIndex].remaining 
+  // Copy the updated entry too, so callers holding the old array are not mutated.
+  const updatedCache = cache.map((t) =>
+    t.name === typeName ? { ...t, remaining: Math.max(0, t.remaining - usedHours) } : t,
+  );
+  const updated = updatedCache.find((t) => t.name === typeName);
+
+  if (updated) {
+    debugLog("create-timeoff.json", "updated_session_cache", {
+      type: typeName,
+      newBalance: updated.remaining,
     });
   }
-  
+
   return updatedCache;
 }
 

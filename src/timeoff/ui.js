@@ -146,33 +146,40 @@ async function selectLeaveType(page, typeName) {
  * @param {Page} page - Puppeteer page
  * @param {string} date - Date to check (DD/MM/YYYY format)
  * @param {string} listUrl - URL to time off list
+ * @param {Object} options - Verification options
+ * @param {string} [options.startTime] - Expected start time (HH:MM) to avoid matching another request on the same day
+ * @param {number} [options.attempts=3] - Number of fresh list loads before giving up
+ * @param {number} [options.retryDelay=2000] - Delay between attempts in ms
  * @returns {Promise<boolean>} True if found
  */
-async function verifyTimeOffExists(page, date, listUrl) {
-  // Navigate to time off list
-  await page.goto(listUrl, {
-    waitUntil: "networkidle2",
-    timeout: 30000,
-  });
-  
-  try {
-    await page.waitForSelector("table tbody tr.o_data_row", { timeout: 10000 });
-  } catch (err) {
-    debugLog("verifyTimeOffExists_timeout", { message: "Table rows did not appear" });
+async function verifyTimeOffExists(page, date, listUrl, options = {}) {
+  const { startTime = null, attempts = 3, retryDelay = 2000 } = options;
+  const needle = startTime ? `${date} ${startTime}` : date;
+
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    // Odoo URLs only differ by hash; leave the page first so the list is a full fresh load.
+    await page.goto("about:blank");
+    await page.goto(listUrl, { waitUntil: "networkidle2", timeout: 30000 });
+
+    try {
+      await page.waitForSelector("table tbody tr.o_data_row", { timeout: 10000 });
+    } catch (err) {
+      debugLog("verifyTimeOffExists_timeout", { attempt, message: "Table rows did not appear" });
+    }
+
+    const found = await page.evaluate((target) => {
+      const rows = document.querySelectorAll("table tbody tr.o_data_row");
+      return Array.from(rows).some((row) =>
+        Array.from(row.querySelectorAll("td")).some((cell) => cell.textContent.includes(target)),
+      );
+    }, needle);
+
+    if (found) return true;
+    debugLog("verifyTimeOffExists_not_found", { attempt, needle });
+    if (attempt < attempts) await sleep(retryDelay);
   }
 
-  const found = await page.evaluate((targetDate) => {
-    const rows = document.querySelectorAll("table tbody tr.o_data_row");
-    for (const row of rows) {
-      const cells = Array.from(row.querySelectorAll("td")).map((c) => c.textContent);
-      if (cells.some((cell) => cell.includes(targetDate))) {
-        return true;
-      }
-    }
-    return false;
-  }, date);
-
-  return found;
+  return false;
 }
 
 module.exports = {

@@ -1,0 +1,89 @@
+<form string="Time Off Request">
+                    <!-- COMPUTE Fields -->
+                    <field name="can_reset" invisible="1" modifiers="{&quot;invisible&quot;: true, &quot;readonly&quot;: true}"/>
+                    <field name="can_approve" invisible="1" modifiers="{&quot;invisible&quot;: true, &quot;readonly&quot;: true}"/>
+                    <field name="can_refuse" invisible="1" modifiers="{&quot;invisible&quot;: true, &quot;readonly&quot;: true}"/>
+                    <header invisible="1" modifiers="{&quot;invisible&quot;: true}">
+                        <button string="Confirm" name="action_confirm" states="draft" type="object" class="oe_highlight" modifiers="{&quot;invisible&quot;: [[&quot;state&quot;, &quot;not in&quot;, [&quot;draft&quot;]]]}"/>
+                        <button string="Approve" name="action_approve" type="object" class="oe_highlight" attrs="{'invisible': ['|', ('can_approve', '=', False), ('state', '!=', 'confirm')]}" modifiers="{&quot;invisible&quot;: [&quot;|&quot;, [&quot;can_approve&quot;, &quot;=&quot;, false], [&quot;state&quot;, &quot;!=&quot;, &quot;confirm&quot;]]}"/>
+                    <button string="2nd Approve" name="action_validate" type="object" class="oe_highlight" attrs="{'invisible': [('state', '!=', 'validate2')]}" modifiers="{&quot;invisible&quot;: [[&quot;state&quot;, &quot;!=&quot;, &quot;validate2&quot;]]}"/>
+                
+                        <button string="Validate" name="action_validate" states="validate1" type="object" class="oe_highlight" invisible="1" modifiers="{&quot;invisible&quot;: true}"/>
+                        <button string="Cancel" name="action_refuse" type="object" attrs="{'invisible': [('state', '!=', 'draft')]}" modifiers="{&quot;invisible&quot;: [[&quot;state&quot;, &quot;!=&quot;, &quot;draft&quot;]]}"/>
+                        <button string="Refuse" name="action_refuse" type="object" attrs="{'invisible': ['|', ('responsible_can_refuse', '=', False), ('state', 'not in', ('confirm'))]}" modifiers="{&quot;invisible&quot;: [&quot;|&quot;, [&quot;responsible_can_refuse&quot;, &quot;=&quot;, false], [&quot;state&quot;, &quot;not in&quot;, &quot;confirm&quot;]]}"/>
+                        <button string="Refuse" name="action_refuse" type="object" attrs="{'invisible': ['|', ('can_refuse', '=', False), ('state', 'not in', ('validate1', 'validate'))]}" modifiers="{&quot;invisible&quot;: [&quot;|&quot;, [&quot;can_refuse&quot;, &quot;=&quot;, false], [&quot;state&quot;, &quot;not in&quot;, [&quot;validate1&quot;, &quot;validate&quot;]]]}"/>
+                        <button string="Mark as Draft" name="action_draft" type="object" attrs="{'invisible': ['|', ('can_reset', '=', False), ('state', 'not in', ['confirm', 'refuse'])]}" modifiers="{&quot;invisible&quot;: [&quot;|&quot;, [&quot;can_reset&quot;, &quot;=&quot;, false], [&quot;state&quot;, &quot;not in&quot;, [&quot;confirm&quot;, &quot;refuse&quot;]]]}"/>
+                        <field name="state" widget="statusbar" statusbar_visible="confirm,validate" on_change="1" modifiers="{}"/>
+                        <field name="responsible_can_refuse" invisible="1" modifiers="{&quot;invisible&quot;: true, &quot;readonly&quot;: true}"/>
+                    </header>
+                    <sheet>
+                        <div class="alert alert-info" role="alert" attrs="{'invisible': ['|', ('tz_mismatch', '=', False), ('holiday_type', '=', 'category')]}" modifiers="{&quot;invisible&quot;: [&quot;|&quot;, [&quot;tz_mismatch&quot;, &quot;=&quot;, false], [&quot;holiday_type&quot;, &quot;=&quot;, &quot;category&quot;]]}">
+                            <span attrs="{'invisible': [('holiday_type', '!=', 'employee')]}" modifiers="{&quot;invisible&quot;: [[&quot;holiday_type&quot;, &quot;!=&quot;, &quot;employee&quot;]]}">
+                                The employee has a different timezone than yours! Here dates and times are displayed in
+                                the
+                                employee's timezone
+                            </span>
+                            <span attrs="{'invisible': [('holiday_type', '!=', 'department')]}" modifiers="{&quot;invisible&quot;: [[&quot;holiday_type&quot;, &quot;!=&quot;, &quot;department&quot;]]}">
+                                The department's company has a different timezone than yours! Here dates and times are
+                                displayed in the company's timezone
+                            </span>
+                            <span attrs="{'invisible': [('holiday_type', '!=', 'company')]}" modifiers="{&quot;invisible&quot;: [[&quot;holiday_type&quot;, &quot;!=&quot;, &quot;company&quot;]]}">
+                                The company has a different timezone than yours! Here dates and times are displayed in
+                                the
+                                company's timezone
+                            </span>
+                            (
+                            <field name="tz" on_change="1" modifiers="{&quot;readonly&quot;: true}"/>
+                            ).
+                        </div>
+                        <field name="tz_mismatch" invisible="1" modifiers="{&quot;invisible&quot;: true, &quot;readonly&quot;: true}"/>
+                        <field name="holiday_type" invisible="1" on_change="1" modifiers="{&quot;invisible&quot;: true, &quot;readonly&quot;: [[&quot;state&quot;, &quot;not in&quot;, [&quot;draft&quot;, &quot;confirm&quot;]]], &quot;required&quot;: true}"/>
+                        <field name="leave_type_request_unit" invisible="1" modifiers="{&quot;invisible&quot;: true, &quot;readonly&quot;: true}"/>
+                        <div class="oe_title" name="title">
+                            <h2>
+                                <field name="holiday_status_id" nolabel="1" domain="['|', ('validity_start', '=', False), ('validity_start', '&lt;=', context_today().strftime('%Y-%m-%d')), '|', ('validity_stop', '=', False), ('validity_stop', '&gt;=', context_today().strftime('%Y-%m-%d')), '|', ('allow_use_negative_leave', '=', True), '&amp;', ('virtual_remaining_leaves', '&gt;', 0), '|', ('allocation_type', 'in', ['fixed_allocation', 'no']),'&amp;',('allocation_type', '=', 'fixed'), ('max_leaves', '&gt;', '0')]" context="{'employee_id':employee_id, 'default_date_from':date_from}" options="{'no_create': True, 'no_open': True}" class="w-100" on_change="1" can_create="false" can_write="false" modifiers="{&quot;readonly&quot;: [[&quot;state&quot;, &quot;in&quot;, [&quot;cancel&quot;, &quot;refuse&quot;, &quot;validate1&quot;, &quot;validate&quot;]]], &quot;required&quot;: true}"/>
+                            </h2>
+                        </div>
+                        <group>
+                            <group>
+                                <field name="employee_id" readonly="1" force_save="1" on_change="1" can_create="false" can_write="false" modifiers="{&quot;readonly&quot;: true}"/>
+                                <field name="manager_id" invisible="1" can_create="false" can_write="false" modifiers="{&quot;invisible&quot;: true}"/>
+                                <field name="division_id" readonly="1" force_save="1" can_create="false" can_write="false" modifiers="{&quot;readonly&quot;: true}"/>
+                            </group>
+                            <group>
+                                <field name="approve_by_id" readonly="1" force_save="1" can_create="false" can_write="false" modifiers="{&quot;readonly&quot;: true}"/>
+                            </group>
+                            <group>
+                                <field name="date_from" attrs="{                                                 'readonly': [('state', 'not in', ('draft', 'confirm'))],                                                 'required': True                                     }" on_change="1" modifiers="{&quot;readonly&quot;: [[&quot;state&quot;, &quot;not in&quot;, [&quot;draft&quot;, &quot;confirm&quot;]]], &quot;required&quot;: true}"/>
+                            </group>
+                            <group>
+                                <field name="date_to" attrs="{                                                 'readonly': [('state', 'not in', ('draft', 'confirm'))],                                                 'required': True                                     }" on_change="1" modifiers="{&quot;readonly&quot;: [[&quot;state&quot;, &quot;not in&quot;, [&quot;draft&quot;, &quot;confirm&quot;]]], &quot;required&quot;: true}"/>
+                            </group>
+                            <group>
+                                
+                    <field name="number_of_minutes_display" readonly="1" force_save="1" modifiers="{&quot;readonly&quot;: true}"/>
+                <field name="number_of_hours_display" widget="float_time" string="Duration (Hours)" readonly="1" force_save="1" on_change="1" modifiers="{&quot;readonly&quot;: true}"/>
+                                <field name="number_of_days" string="Duration (Days)" readonly="1" force_save="1" on_change="1" modifiers="{&quot;readonly&quot;: true}"/>
+                            </group>
+                            <group>
+                                <field name="email_cc_ids" widget="many2many_tags_avatar" options="{'no_create': True, 'no_create_edit': True}" context="{'get_name_work_mail': True}" can_create="false" can_write="false" modifiers="{}"/>
+                    <field name="validation_type" invisible="1" readonly="1" modifiers="{&quot;invisible&quot;: true, &quot;readonly&quot;: true}"/>
+                    <field name="approval_2nd_id" attrs="{'invisible': [('validation_type', '!=', 'manager_director')], 'required': [('validation_type', '==', 'manager_director')]}" can_create="false" can_write="false" modifiers="{&quot;invisible&quot;: [[&quot;validation_type&quot;, &quot;!=&quot;, &quot;manager_director&quot;]], &quot;required&quot;: [[&quot;validation_type&quot;, &quot;==&quot;, &quot;manager_director&quot;]]}"/>
+                
+                            </group>
+                        </group>
+                        <group>
+                            <field name="name" string="Reason" attrs="{'readonly': [('state', 'not in', ('draft', 'confirm'))]}" widget="text" modifiers="{&quot;readonly&quot;: [[&quot;state&quot;, &quot;not in&quot;, [&quot;draft&quot;, &quot;confirm&quot;]]]}"/>
+                        </group>
+                    </sheet>
+                <footer>
+                    <button string="Save" special="save" class="oe_highlight"/>
+                    <button string="Discard" special="cancel"/>
+                </footer>
+            
+                    <div class="oe_chatter">
+                        <field name="message_follower_ids" modifiers="{}"/>
+                        <field name="activity_ids" modifiers="{}"/>
+                        <field name="message_ids" modifiers="{}"/>
+                    </div>
+                </form>
