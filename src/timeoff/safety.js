@@ -4,6 +4,7 @@
  */
 
 const BUSINESS = require("../business-rules");
+const { bemoError } = require("../utils/errors");
 const { toIsoDate, parseLocalDateTime, toMinutes, systemToday, previousMonthStart } = require("../utils/date");
 
 /**
@@ -63,7 +64,7 @@ function checkCommon(request, countedMinutes, { today, otherMinutesThatDay }) {
  * @param {Object} context - Checking context
  * @param {string} [context.today] - "YYYY-MM-DD" in the user's timezone
  * @param {number} [context.otherMinutesThatDay=0] - Active time off already on that day
- * @param {Array<{checkIn: string, lateMinutes: number}>} context.attendance - That day's attendance on Bemo (required)
+ * @param {Array<{checkIn: string, lateMinutes: number}>} [context.attendance] - That day's attendance on Bemo (missing = violation)
  * @returns {Array<string>} Violations (empty when safe)
  */
 function checkLateRequest(request, { today = systemToday(), otherMinutesThatDay = 0, attendance } = {}) {
@@ -172,9 +173,7 @@ function checkRun(records) {
  */
 function assertSafe(violations, scope) {
   if (violations.length) {
-    const err = new Error(`Safety rule violated (${scope}): ${violations.join("; ")}`);
-    err.code = "BEMO_SAFETY";
-    throw err;
+    throw bemoError(`Safety rule violated (${scope}): ${violations.join("; ")}`, "BEMO_SAFETY");
   }
 }
 

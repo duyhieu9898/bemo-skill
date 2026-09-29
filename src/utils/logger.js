@@ -3,6 +3,7 @@
  */
 const fs = require("fs");
 const path = require("path");
+const { bemoError } = require("./errors");
 
 const ICONS = {
   success: "✅",
@@ -217,9 +218,7 @@ const createTimeOffLogger = {
 const dataLogger = {
   saved: (count, filename) => baseLog.success(`Saved ${count} records to ${filename}`),
   notLoggedIn: () => {
-    const err = new Error("Not logged in to Bemo. Run: npm run auth");
-    err.code = "BEMO_NOT_LOGGED_IN";
-    throw err;
+    throw bemoError("Not logged in to Bemo. Run: npm run auth", "BEMO_NOT_LOGGED_IN");
   },
 };
 

@@ -28,6 +28,11 @@ const {
 } = require("./datetime");
 
 const debugLog = (action, data) => _debugLog("create-timeoff.json", action, data);
+
+/**
+ * Outcome for one day. status: created | unverified | exists | skipped | dry-run
+ * @typedef {{status: "created"|"unverified"|"exists"|"skipped"|"dry-run", date: string} & Record<string, any>} LeaveResult
+ */
 const MODEL = "hr.leave";
 const INACTIVE_STATES = ["cancel", "refuse"];
 
@@ -73,6 +78,7 @@ async function fetchLeaveTypes(conn, employeeId) {
     "|", ["allocation_type", "in", ["fixed_allocation", "no"]],
     "&", ["allocation_type", "=", "fixed"], ["max_leaves", ">", "0"],
   ];
+  /** @type {import("./types").OdooLeaveType[]} */
   const types = await conn.rpc.callKw("hr.leave.type", "search_read", [], {
     domain,
     fields: ["name", "request_unit", "virtual_remaining_leaves"],
@@ -129,6 +135,7 @@ async function employeeBelongsToUser(conn, employeeId) {
 async function findAttendanceOnDay(conn, employeeId, date) {
   const dayStart = localDisplayToOdoo(`${date} 00:00`, conn.tz);
   const dayEnd = formatOdooDatetime(parseOdooDatetime(dayStart) + 24 * 3600 * 1000);
+  /** @type {import("./types").OdooAttendance[]} */
   const rows = await conn.rpc.callKw("hr.attendance", "search_read", [], {
     domain: [["employee_id", "=", employeeId], ["check_in", ">=", dayStart], ["check_in", "<", dayEnd]],
     fields: ["check_in", "hours_arrive_late"],
@@ -186,6 +193,7 @@ async function fillPart(form, { employeeId, leaveType, dateFrom, dateTo, minutes
 async function commitPart(conn, date, part) {
   const createValues = part.form.createValues();
   const id = await conn.rpc.callKw(MODEL, "create", [createValues], { context: conn.context });
+  /** @type {import("./types").OdooLeave[]} */
   const [saved] = await conn.rpc.callKw(MODEL, "read", [[id], ["state", "date_from", "date_to", "holiday_status_id", "number_of_minutes_display"]], {
     context: conn.context,
   });
@@ -195,8 +203,9 @@ async function commitPart(conn, date, part) {
     if (INACTIVE_STATES.includes(saved.state)) mismatches.push(`state=${saved.state}`);
     if (saved.date_from !== part.dateFrom) mismatches.push(`date_from=${saved.date_from} (sent ${part.dateFrom})`);
     if (saved.date_to !== part.dateTo) mismatches.push(`date_to=${saved.date_to} (sent ${part.dateTo})`);
-    if (saved.holiday_status_id?.[0] !== part.leaveType.id) {
-      mismatches.push(`type=${saved.holiday_status_id?.[1]} (sent ${part.leaveType.name})`);
+    const savedType = saved.holiday_status_id || [false, "none"];
+    if (savedType[0] !== part.leaveType.id) {
+      mismatches.push(`type=${savedType[1]} (sent ${part.leaveType.name})`);
     }
     if (saved.number_of_minutes_display !== part.minutes) {
       mismatches.push(`minutes=${saved.number_of_minutes_display} (sent ${part.minutes})`);
@@ -218,10 +227,11 @@ async function commitPart(conn, date, part) {
  * @param {string} request.end - Local "DD/MM/YYYY HH:MM"
  * @param {number} request.minutes - Minutes the server must count for the whole day's request
  * @param {string} request.reason - Description
+ * @param {string} [request.canonicalDate] - ISO date carried into the result
  * @param {boolean} [request.split=false] - Allow splitting over several leave types
  * @param {function} request.checkSafety - async ({parts, otherMinutesThatDay, employeeId, today}) => violations
- * @param {Object} options - {dryRun, today}
- * @returns {Promise<{status: string, ...}>} status: created | unverified | exists | skipped | dry-run
+ * @param {{dryRun?: boolean, today?: string}} [options] - Dry run / reference day
+ * @returns {Promise<LeaveResult>}
  */
 async function submitLeaveRequest(conn, arch, request, { dryRun = false, today = localToday(conn.tz) } = {}) {
   const { date, start, end, minutes, reason, checkSafety, split = false } = request;
@@ -347,7 +357,7 @@ async function submitLeaveRequest(conn, arch, request, { dryRun = false, today =
  * @param {Object} conn - Connection
  * @param {string} arch - Dialog form arch
  * @param {Object} record - Late record {date, checkInDateTime, lateMinutes, reason}
- * @param {Object} options - {dryRun, today}
+ * @param {{dryRun?: boolean, today?: string}} [options] - Dry run / reference day
  */
 async function createLateTimeOff(conn, arch, record, options = {}) {
   const { date, checkInDateTime, lateMinutes } = record;
@@ -378,7 +388,7 @@ async function createLateTimeOff(conn, arch, record, options = {}) {
  * @param {Object} conn - Connection
  * @param {string} arch - Dialog form arch
  * @param {Object} record - {date: "DD/MM/YYYY", reason?}
- * @param {Object} options - {dryRun, today}
+ * @param {{dryRun?: boolean, today?: string}} [options] - Dry run / reference day
  */
 async function createFullDayTimeOff(conn, arch, record, options = {}) {
   const { date } = record;

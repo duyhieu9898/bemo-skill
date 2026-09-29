@@ -7,5 +7,6 @@ module.exports = {
   ...require("./date"),
   ...require("./file"),
   ...require("./logger"),
+  ...require("./errors"),
   baseLog: require("./logger").baseLog,
 };

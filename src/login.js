@@ -15,7 +15,7 @@ const TIMEOUT = {
 
 /**
  * Check if currently on login page
- * @param {Page} page - Puppeteer page
+ * @param {import("puppeteer-core").Page} page - Puppeteer page
  * @returns {boolean}
  */
 function isOnLoginPage(page) {

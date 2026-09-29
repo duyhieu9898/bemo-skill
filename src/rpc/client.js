@@ -4,14 +4,12 @@
  */
 
 const CONFIG = require("../config");
-const { withBrowser } = require("../utils");
+const { withBrowser, bemoError } = require("../utils");
 
 const BASE_URL = new URL(CONFIG.urls.login).origin;
 
 function notLoggedIn(detail) {
-  const err = new Error(`Not logged in to Bemo${detail ? ` (${detail})` : ""}. Run: npm run auth`);
-  err.code = "BEMO_NOT_LOGGED_IN";
-  return err;
+  return bemoError(`Not logged in to Bemo${detail ? ` (${detail})` : ""}. Run: npm run auth`, "BEMO_NOT_LOGGED_IN");
 }
 
 /**
@@ -47,9 +45,9 @@ function createClient(sessionId, { fetchImpl = fetch } = {}) {
     if (body.error) {
       const name = body.error.data?.name || "";
       if (name.includes("SessionExpired")) throw notLoggedIn("session expired");
-      const err = new Error(body.error.data?.message || body.error.message || "Unknown Odoo error");
-      err.odooName = name;
-      throw err;
+      throw bemoError(body.error.data?.message || body.error.message || "Unknown Odoo error", "BEMO_ODOO_ERROR", {
+        odooName: name,
+      });
     }
     return body.result;
   }

@@ -49,6 +49,7 @@ function parseFormFields(arch) {
  * @returns {Object<string, string>}
  */
 function buildOnchangeSpec(fields) {
+  /** @type {Record<string, string>} */
   const spec = {};
   for (const field of fields) spec[field.path] = spec[field.path] === "1" || field.onChange ? "1" : "";
   return spec;

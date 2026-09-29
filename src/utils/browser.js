@@ -9,7 +9,7 @@ const { dataLogger: logger } = require("./logger");
  * Create a new browser instance
  * @param {Object} config - Config object with getLaunchOptions method
  * @param {boolean} headless - Run in headless mode
- * @returns {Promise<Browser>}
+ * @returns {Promise<import("puppeteer-core").Browser>}
  */
 async function createBrowser(config, headless = true) {
   return puppeteer.launch(config.getLaunchOptions(headless));
@@ -17,7 +17,7 @@ async function createBrowser(config, headless = true) {
 
 /**
  * Navigate to URL and check login status
- * @param {Page} page - Puppeteer page
+ * @param {import("puppeteer-core").Page} page - Puppeteer page
  * @param {string} url - URL to navigate to
  * @param {Object} options - Navigation options
  * @param {number} [options.timeout=30000] - Navigation timeout
@@ -44,7 +44,7 @@ function sleep(ms) {
 
 /**
  * Safe browser cleanup
- * @param {Browser} browser - Puppeteer browser instance
+ * @param {import("puppeteer-core").Browser} browser - Puppeteer browser instance
  */
 async function closeBrowser(browser) {
   try {

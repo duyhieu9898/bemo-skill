@@ -23,6 +23,7 @@ function floatToHHMM(hours) {
  * @returns {Promise<Array<{date, checkInDateTime, late, lateMinutes}>>}
  */
 async function fetchAttendance(conn, { year, monthIndex }) {
+  /** @type {import("./types").OdooAttendance[]} */
   const rows = await conn.rpc.callKw("hr.attendance", "search_read", [], {
     domain: [
       ["employee_id.user_id", "=", conn.uid],
@@ -56,6 +57,7 @@ async function fetchTimeOff(conn, { from, to }) {
   });
   const stateLabels = Object.fromEntries(stateField.state.selection);
 
+  /** @type {import("./types").OdooLeave[]} */
   const rows = await conn.rpc.callKw("hr.leave", "search_read", [], {
     domain: [
       ["user_id", "=", conn.uid],
@@ -69,7 +71,7 @@ async function fetchTimeOff(conn, { from, to }) {
   });
 
   return rows.map((row) => ({
-    type: row.holiday_status_id?.[1] || "",
+    type: (row.holiday_status_id && row.holiday_status_id[1]) || "",
     startDate: odooToLocalDisplay(row.date_from, conn.tz),
     endDate: odooToLocalDisplay(row.date_to, conn.tz),
     status: stateLabels[row.state] || row.state,

@@ -6,6 +6,7 @@
 const fs = require("fs");
 const path = require("path");
 const CONFIG = require("../config");
+const { bemoError } = require("../utils/errors");
 
 const DEFAULT_LOCK_FILE = path.join(path.dirname(CONFIG.dataFiles.actionNeeded), ".create-timeoff.lock");
 
@@ -50,9 +51,7 @@ async function withCreateLock(fn, { lockFile = DEFAULT_LOCK_FILE } = {}) {
   }
   if (!attempt.acquired) {
     const who = attempt.holder ? `pid ${attempt.holder.pid} since ${attempt.holder.startedAt}` : "unknown holder";
-    const err = new Error(`Another time off creation is running (${who}). Lock: ${lockFile}`);
-    err.code = "BEMO_LOCKED";
-    throw err;
+    throw bemoError(`Another time off creation is running (${who}). Lock: ${lockFile}`, "BEMO_LOCKED");
   }
 
   try {

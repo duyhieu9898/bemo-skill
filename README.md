@@ -93,6 +93,7 @@ Các entrypoint workflow tương ứng trong package scripts:
 Mã thoát khác 0 khi có đơn lỗi hoặc đơn **đã lưu nhưng sai** (in kèm id để kiểm tra trên Bemo).
 
 ### ⚙️ Lệnh bổ trợ khác
+- `npm test` / `npm run typecheck`: Unit test và kiểm tra kiểu (JSDoc, `jsconfig.json`; kiểu bản ghi Odoo ở `src/rpc/types.js`).
 - `npm run auth`: Đăng nhập lại nếu bị hết hạn session.
 - `npm run checkout`: Checkout ngay (thủ công, không bị chặn bởi đánh dấu làm thêm giờ).
 - `npm run overtime -- on [YYYY-MM-DD]` / `off` / `status`: Đánh dấu ngày làm thêm giờ. Cron 17:00 chạy

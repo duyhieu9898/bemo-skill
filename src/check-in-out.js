@@ -16,8 +16,8 @@ const ATTENDANCE_RPC_TIMEOUT = 30000;
  * Perform Check In/Out action, logging in once and retrying if the session expired
  * @param {boolean} headless - Run in headless mode
  * @param {object} options - Runtime options
- * @param {boolean} options.checkoutOnly - Only click when the current action is Check out
- * @param {boolean} options.respectOvertime - Skip when today is marked as overtime (automatic runs)
+ * @param {boolean} [options.checkoutOnly] - Only click when the current action is Check out
+ * @param {boolean} [options.respectOvertime] - Skip when today is marked as overtime (automatic runs)
  */
 async function checkInOut(headless = true, options = {}) {
   console.log(`🚀 Starting Check In/Out process...`);

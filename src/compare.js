@@ -148,7 +148,7 @@ function addReasonToRecords(records) {
 /**
  * Main compare function
  * @param {Object} options - Options
- * @param {boolean} options.skipTimestampCheck - Skip timestamp validation
+ * @param {boolean} [options.skipTimestampCheck] - Skip timestamp validation
  * @returns {Object} Comparison results
  */
 function compare(options = {}) {
