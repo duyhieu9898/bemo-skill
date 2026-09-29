@@ -147,7 +147,8 @@ async function createOne(page, record, manual = false, skipVerify = false) {
   }
 
   // Validate duration
-  const durationValidation = await validateDuration(page, lateMinutes, CONFIG.rules.maxLateMinutes);
+  const maxAllowedMinutes = Math.max(CONFIG.rules.maxLateMinutes, lateMinutes);
+  const durationValidation = await validateDuration(page, lateMinutes, maxAllowedMinutes);
 
   if (!durationValidation.found) {
     log.durationWarning(`Could not validate duration field: ${durationValidation.message}`);
