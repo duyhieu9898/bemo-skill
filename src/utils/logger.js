@@ -22,7 +22,12 @@ const ICONS = {
   pause: "⏸️",
 };
 
-const LOG_DIR = path.join(__dirname, "..", "..", "logs");
+// BEMO_LOG_DIR overrides the location; under `node --test` logs go to a temp dir so tests never touch logs/.
+const LOG_DIR =
+  process.env.BEMO_LOG_DIR ||
+  (process.env.NODE_TEST_CONTEXT
+    ? path.join(require("os").tmpdir(), "bemo-test-logs")
+    : path.join(__dirname, "..", "..", "logs"));
 const MAIN_LOG_FILE = path.join(LOG_DIR, "bemo.log");
 
 /**
@@ -221,7 +226,7 @@ const dataLogger = {
  */
 function debugLog(filename, action, data = {}) {
   try {
-    const logFile = path.join(__dirname, "..", "..", "logs", filename);
+    const logFile = path.join(LOG_DIR, filename);
     const logDir = path.dirname(logFile);
     
     if (!fs.existsSync(logDir)) {

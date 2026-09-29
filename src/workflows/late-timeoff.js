@@ -5,27 +5,15 @@ const crypto = require("node:crypto");
 const CONFIG = require("../config");
 const BUSINESS = require("../business-rules");
 const { createTimeOff } = require("../create-timeoff");
-const { loadJSON } = require("../utils");
+const { loadJSON, toIsoDate } = require("../utils");
 
 const PLAN_VERSION = 1;
 const ACTION_FILE = CONFIG.dataFiles.actionNeeded;
 
 function normalizeDate(value) {
-  if (typeof value !== "string") throw new Error(`Invalid date: ${String(value)}`);
-  let canonical = value;
-  const providerMatch = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-  if (providerMatch) canonical = `${providerMatch[3]}-${providerMatch[2]}-${providerMatch[1]}`;
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(canonical)) throw new Error(`Invalid date: ${value}`);
-  const [year, month, day] = canonical.split("-").map(Number);
-  const parsed = new Date(Date.UTC(year, month - 1, day));
-  if (
-    parsed.getUTCFullYear() !== year ||
-    parsed.getUTCMonth() !== month - 1 ||
-    parsed.getUTCDate() !== day
-  ) {
-    throw new Error(`Invalid date: ${value}`);
-  }
-  return canonical;
+  const iso = toIsoDate(value);
+  if (!iso) throw new Error(`Invalid date: ${String(value)}`);
+  return iso;
 }
 
 function normalizeRecord(record) {

@@ -6,7 +6,7 @@
 
 const CONFIG = require("./config");
 const BUSINESS = require("./business-rules");
-const { saveJSON, createDataWrapper, parseDate, getFilterMonths, isInFilterMonths, dataLogger } = require("./utils");
+const { saveJSON, createDataWrapper, getFilterMonths, isInFilterMonths, dataLogger } = require("./utils");
 const { connect } = require("./rpc/client");
 const { fetchTimeOff } = require("./rpc/sync");
 
@@ -35,8 +35,8 @@ function isLateTimeOff(record) {
  * @returns {Array} Filtered records
  */
 function filterByCurrentMonths(records) {
-  const filters = getFilterMonths();
-  return records.filter((record) => isInFilterMonths(parseDate(record.startDate), filters));
+  const months = getFilterMonths();
+  return records.filter((record) => isInFilterMonths(record.startDate, months));
 }
 
 /**
@@ -45,11 +45,8 @@ function filterByCurrentMonths(records) {
  * @returns {Array} Filtered records
  */
 function filterByPreviousMonths(records) {
-  const now = new Date();
-  const currMonth = now.getMonth();
-  const currYear = now.getFullYear();
-  const filters = [{ month: currMonth === 0 ? 11 : currMonth - 1, year: currMonth === 0 ? currYear - 1 : currYear }];
-  return records.filter((record) => isInFilterMonths(parseDate(record.startDate), filters));
+  const [, previous] = getFilterMonths();
+  return records.filter((record) => isInFilterMonths(record.startDate, [previous]));
 }
 
 /**

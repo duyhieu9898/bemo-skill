@@ -4,31 +4,7 @@
  */
 
 const BUSINESS = require("../business-rules");
-
-const DATE_RE = /^(\d{2})\/(\d{2})\/(\d{4})$/;
-const DATETIME_RE = /^(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2})(?::\d{2})?$/;
-
-/** "DD/MM/YYYY" -> "YYYY-MM-DD" or null */
-function toIsoDate(date) {
-  const m = typeof date === "string" && date.match(DATE_RE);
-  if (!m) return null;
-  const iso = `${m[3]}-${m[2]}-${m[1]}`;
-  const d = new Date(`${iso}T00:00:00Z`);
-  return d.toISOString().slice(0, 10) === iso ? iso : null;
-}
-
-/** "DD/MM/YYYY HH:MM" -> {date: "DD/MM/YYYY", minutes: minutes since midnight} or null */
-function parseLocalDateTime(value) {
-  const m = typeof value === "string" && value.match(DATETIME_RE);
-  if (!m) return null;
-  return { date: `${m[1]}/${m[2]}/${m[3]}`, minutes: Number(m[4]) * 60 + Number(m[5]) };
-}
-
-/** "HH:MM" -> minutes since midnight */
-const toMinutes = (time) => {
-  const [hour, minute] = time.split(":").map(Number);
-  return hour * 60 + minute;
-};
+const { toIsoDate, parseLocalDateTime, toMinutes, systemToday, previousMonthStart } = require("../utils/date");
 
 /**
  * Working minutes in one day according to the schedule (lunch excluded)
@@ -39,19 +15,6 @@ function workMinutesPerDay({ start, lunchStart, lunchEnd, end }) {
   if (!end) throw new Error("workSchedule.end must be configured");
   const lunch = lunchStart && lunchEnd ? toMinutes(lunchEnd) - toMinutes(lunchStart) : 0;
   return toMinutes(end) - toMinutes(start) - lunch;
-}
-
-/** First day of the month before `today` ("YYYY-MM-DD") */
-function previousMonthStart(today) {
-  const [year, month] = today.split("-").map(Number);
-  const d = new Date(Date.UTC(year, month - 2, 1));
-  return d.toISOString().slice(0, 10);
-}
-
-/** Local "YYYY-MM-DD" of the machine clock */
-function systemToday(now = new Date()) {
-  const pad = (n) => String(n).padStart(2, "0");
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }
 
 /**
@@ -193,6 +156,5 @@ module.exports = {
   checkFullDayRequest,
   checkRun,
   assertSafe,
-  previousMonthStart,
   workMinutesPerDay,
 };
