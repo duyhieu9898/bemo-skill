@@ -37,7 +37,9 @@ async function main() {
   if (summary.failed.length || summary.unverified.length) process.exit(1);
 }
 
-main().catch((err) => {
-  console.error("❌", err.message);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((err) => {
+    console.error("❌", err.message);
+    process.exit(1);
+  });
+}

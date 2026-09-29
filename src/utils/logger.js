@@ -142,9 +142,9 @@ const compareLogger = {
  * Create Time Off module logger
  */
 const createTimeOffLogger = {
-  createStart: (date, checkInTime, lateMinutes, requiredHours, workStartTime) => {
+  createStart: (date, endTime, minutes, requiredHours, startTime) => {
     baseLog.raw(`\n${ICONS.create} Creating: ${date}`);
-    baseLog.indent(`Time: ${workStartTime} → ${checkInTime} (${lateMinutes} mins = ${requiredHours.toFixed(2)}h)`);
+    baseLog.indent(`Time: ${startTime} → ${endTime} (${minutes} mins = ${requiredHours.toFixed(2)}h)`);
   },
 
   leaveTypes: (types) => {
@@ -154,23 +154,8 @@ const createTimeOffLogger = {
     });
   },
 
-  insufficientBalance: (required, types) => {
-    baseLog.indent(`${ICONS.error} Both leave types have insufficient balance!`);
-    baseLog.indent(`Required: ${required} hours`, 2);
-    types.forEach((t) => {
-      const status = t.remaining >= required ? `${ICONS.success} OK` : `${ICONS.error} Not enough`;
-      baseLog.indent(`- ${t.name}: ${t.remaining}h ${status}`, 2);
-    });
-  },
-
   selectedType: (type) => {
     baseLog.indent(`${ICONS.success} Selected: ${type.name} (${type.remaining}h available)`);
-  },
-
-  fillResult: (result) => baseLog.indent(`Fill result: ${JSON.stringify(result)}`),
-
-  durationCheck: (validation) => {
-    baseLog.indent(`${ICONS.duration} Duration check: ${JSON.stringify(validation)}`);
   },
 
   durationValid: (minutes) => {
@@ -179,21 +164,9 @@ const createTimeOffLogger = {
 
   durationWarning: (msg) => baseLog.indent(`${ICONS.warning} ${msg}`),
 
-  manualMode: () => {
-    baseLog.indent(`${ICONS.pause} MANUAL MODE: Please click Save in browser (60s)...`);
-  },
-
-  autoSaving: () => baseLog.indent(`${ICONS.save} Auto-saving...`),
-
-  savedWithoutVerify: () => baseLog.indent(`${ICONS.success} Saved (skipped verification)`),
-
   skipping: (reason) => {
     baseLog.raw(`   ${ICONS.warning}  ${reason}`);
     baseLog.indent(`${ICONS.skip} Skipping this record...`);
-  },
-
-  skipped: (date) => {
-    baseLog.indent(`${ICONS.skip} Skipped ${date} due to insufficient balance`);
   },
 
   failed: (msg) => baseLog.raw(`   ${ICONS.error} Failed: ${msg}`),
@@ -201,36 +174,31 @@ const createTimeOffLogger = {
   summary: (created, failed, skipped = 0, unverified = 0) => {
     baseLog.raw(`\n${ICONS.success} Created: ${created}`);
     if (unverified > 0) {
-      baseLog.raw(`${ICONS.warning} Saved but unverified: ${unverified} (run data:sync before retrying)`);
+      baseLog.raw(`${ICONS.error} Saved but WRONG: ${unverified} (see messages above, check them in Bemo)`);
     }
     if (skipped > 0) baseLog.raw(`${ICONS.skip} Skipped: ${skipped}`);
     if (failed > 0) baseLog.raw(`${ICONS.error} Failed: ${failed}`);
   },
 
-  modeInfo: (count, isManual) => {
-    baseLog.raw(`${ICONS.create} Creating ${count} Time Off request(s)\n`);
-    baseLog.raw(`Mode: ${isManual ? "MANUAL (you click Save)" : "AUTO"}\n`);
-  },
+  modeInfo: (count) => baseLog.raw(`${ICONS.create} Creating ${count} Time Off request(s)`),
 
-  nothingToCreate: () => baseLog.info("Nothing to create. Run: node compare.js"),
+  nothingToCreate: () => baseLog.info("Nothing to create. Run: npm run data:sync"),
   
   missingFile: (file) => {
     baseLog.error(`Missing data file: ${file}`);
-    baseLog.raw("👉 Please run: node compare.js");
+    baseLog.raw("👉 Please run: npm run data:sync");
   },
 
-  verifying: () => baseLog.indent("🔍 Verifying time off was created..."),
-  
-  verified: () => baseLog.indent(`${ICONS.success} Verified: Time off exists in system`),
+  verified: (id) => baseLog.indent(`${ICONS.success} Verified: time off #${id} saved as requested`),
 
-  unverified: (date) =>
-    baseLog.indent(`${ICONS.warning} Saved, but ${date} not visible in list yet. Do NOT recreate; run data:sync to confirm.`),
+  unverified: (date, id, mismatches) => {
+    baseLog.error(`Time off #${id} for ${date} was SAVED but differs from the request: ${mismatches.join("; ")}`);
+    baseLog.raw(`   👉 Check #${id} in Bemo and fix or cancel it by hand. Do NOT recreate ${date}.`);
+  },
   
   alreadyExists: (date) => baseLog.indent(`${ICONS.skip} ${date} already has an active time off in that range, not creating another`),
 
   removed: (date) => baseLog.indent(`${ICONS.success} Removed ${date} from action-needed.json`),
-
-  selectionWarning: (msg) => baseLog.raw(`   ${ICONS.warning}  ${msg}`),
 };
 
 /**
@@ -243,7 +211,6 @@ const dataLogger = {
     err.code = "BEMO_NOT_LOGGED_IN";
     throw err;
   },
-  genericError: (msg) => baseLog.error(msg),
 };
 
 /**

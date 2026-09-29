@@ -46,7 +46,10 @@ function fakeConn(overrides = {}) {
         return { value: {} };
       }
       if (model === "hr.leave" && method === "search_read") return overrides.dayLeaves || [];
-      if (model === "hr.attendance" && method === "search_count") return overrides.attendanceCount || 0;
+      // Default: the late record's real check-in (30/09 08:15 local = 01:15 UTC, 15 mins late).
+      if (model === "hr.attendance" && method === "search_read") {
+        return overrides.attendance ?? [{ check_in: "2026-09-30 01:15:00", hours_arrive_late: 0.25 }];
+      }
       if (model === "hr.employee" && method === "read") return [{ id: 10, user_id: [overrides.employeeUser ?? 1, "User"] }];
       if (model === "hr.leave.type" && method === "search_read") return types;
       if (model === "hr.leave" && method === "create") {
@@ -55,7 +58,8 @@ function fakeConn(overrides = {}) {
       }
       if (model === "hr.leave" && method === "read") {
         return [{ id: 123, state: saved.state, date_from: saved.date_from, date_to: saved.date_to,
-          holiday_status_id: [saved.holiday_status_id, "type"], number_of_minutes_display: saved.number_of_minutes_display }];
+          holiday_status_id: [saved.holiday_status_id, "type"],
+          number_of_minutes_display: overrides.savedMinutes ?? saved.number_of_minutes_display }];
       }
       throw new Error(`unexpected ${model}.${method}`);
     },
@@ -139,7 +143,7 @@ test("refuses future dates and employees that are not the logged-in user", async
 const fullDay = { date: "18/09/2026" };
 
 test("full day: 08:00-17:00 counted as 480 mins, created with the full-day reason", async () => {
-  const { conn, calls } = fakeConn();
+  const { conn, calls } = fakeConn({ attendance: [] });
   const result = await createFullDayTimeOff(conn, arch, fullDay, { today: TODAY });
 
   assert.equal(result.status, "created");
@@ -151,14 +155,14 @@ test("full day: 08:00-17:00 counted as 480 mins, created with the full-day reaso
 });
 
 test("full day: refused when that day has attendance", async () => {
-  const { conn, calls } = fakeConn({ attendanceCount: 1 });
+  const { conn, calls } = fakeConn({ attendance: [{ check_in: "2026-09-18 01:02:00", hours_arrive_late: 0.03 }] });
 
   await assert.rejects(createFullDayTimeOff(conn, arch, fullDay, { today: TODAY }), /has attendance/);
   assert.equal(calls.some((c) => c.method === "create"), false);
 });
 
 test("full day: falls back to compensatory leave only if it has 8 hours, otherwise skips", async () => {
-  const { conn } = fakeConn({ types: [
+  const { conn } = fakeConn({ attendance: [], types: [
     { id: 44, name: "Annual Leave 2026 - Hours", request_unit: "hour", virtual_remaining_leaves: 6.67 },
     { id: 45, name: "Compensatory Leave 2026 - Hours", request_unit: "hour", virtual_remaining_leaves: 4 },
   ] });
@@ -166,4 +170,22 @@ test("full day: falls back to compensatory leave only if it has 8 hours, otherwi
 
   assert.equal(result.status, "skipped");
   assert.match(result.reason, /Required: 8h/);
+});
+
+test("late: refused when Bemo's attendance does not match the request", async () => {
+  const moved = fakeConn({ attendance: [{ check_in: "2026-09-30 01:20:00", hours_arrive_late: 0.33 }] });
+  await assert.rejects(createLateTimeOff(moved.conn, arch, record, { today: TODAY }), /first check-in is 08:20, request ends at 08:15/);
+
+  const none = fakeConn({ attendance: [] });
+  await assert.rejects(createLateTimeOff(none.conn, arch, record, { today: TODAY }), /no attendance on 30\/09\/2026/);
+  assert.equal([...moved.calls, ...none.calls].some((c) => c.method === "create"), false);
+});
+
+test("saved record that differs from the request is reported as unverified with its id", async () => {
+  const { conn } = fakeConn({ savedMinutes: 60 });
+  const result = await createLateTimeOff(conn, arch, record, { today: TODAY });
+
+  assert.equal(result.status, "unverified");
+  assert.equal(result.id, 123);
+  assert.deepEqual(result.mismatches, ["minutes=60 (sent 15)"]);
 });

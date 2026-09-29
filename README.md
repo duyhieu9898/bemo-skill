@@ -4,11 +4,12 @@ Tự động hóa việc tạo Time Off request cho các ngày đi trễ trên B
 
 ## 📋 Tính năng chính
 
-- **Quét dữ liệu**: Tự động lấy dữ liệu chấm công và nghỉ phép từ Bemo.
+- **Đọc dữ liệu qua Odoo JSON-RPC**: Lấy chấm công và nghỉ phép trực tiếp từ API (không scrape giao diện).
 - **So sánh thông minh**: Tìm ra chính xác những ngày đi trễ chưa có đơn nghỉ tương ứng.
-- **Tạo đơn tự động**: Điền form, chọn loại phép tối ưu (ưu tiên phép năm cũ), và thực hiện lưu đơn.
-- **Xác thực đa lớp**: Kiểm tra tính hợp lệ của dữ liệu trước khi lưu và xác nhận sự tồn tại của đơn sau khi lưu.
-- **Chế độ Fast Mode**: Tối ưu hóa tốc độ khi cần tạo số lượng lớn đơn cùng lúc.
+- **Tạo đơn qua API**: Phát lại đúng dialog của giao diện (onchange do server tính), chọn loại phép theo thứ tự ưu tiên.
+- **Luật an toàn cứng**: Kiểm tra trước khi lưu, đọc lại đơn theo id sau khi lưu.
+- **Nghỉ cả ngày**: `npm run off:fullday -- DD/MM/YYYY`.
+- **Checkout** vẫn dùng trình duyệt (Bemo gửi GPS/payload mã hoá khi chấm công).
 
 ## 🚀 Cài đặt
 
@@ -26,14 +27,19 @@ npm install
 ```
 bemo/
 ├── src/
-│   ├── config.js           # Cấu hình URLs, rules và các chỉ số cột
-│   ├── login.js            # Đăng nhập và lưu session
-│   ├── get-attendance.js   # Thu thập dữ liệu chấm công
-│   ├── get-timeoff.js      # Thu thập dữ liệu nghỉ phép đã có
+│   ├── business-rules.js   # Lịch làm việc, ngưỡng đi trễ, thứ tự loại phép, giới hạn an toàn
+│   ├── config.js           # Cấu hình kỹ thuật (URLs, đường dẫn, Chrome)
+│   ├── login.js            # Đăng nhập và lưu session (browser)
+│   ├── check-in-out.js     # Checkout (browser)
+│   ├── get-attendance.js   # Lấy dữ liệu chấm công (API)
+│   ├── get-timeoff.js      # Lấy dữ liệu nghỉ phép đã có (API)
 │   ├── compare.js          # Đối soát tìm ngày cần tạo đơn
-│   ├── create-timeoff.js   # Logic tạo đơn (Core engine)
-│   ├── verify-timeoff.js   # Script xác thực hàng loạt (Batch verify)
-│   └── utils/              # Thư viện helper (Browser, Date, File, Logger)
+│   ├── create-timeoff.js   # Tạo đơn đi trễ từ action-needed.json
+│   ├── create-full-day.js  # Tạo đơn nghỉ cả ngày
+│   ├── verify-timeoff.js   # Dọn action-needed.json khi đơn đã tồn tại
+│   ├── rpc/                # Client JSON-RPC, mô phỏng form Odoo, tạo đơn
+│   ├── timeoff/            # Luật an toàn, chọn loại phép, khoá chạy đồng thời
+│   └── utils/              # Helper (Browser, Date, File, Logger)
 └── data/                   # Nơi lưu trữ dữ liệu JSON
 ```
 
@@ -74,39 +80,34 @@ Các entrypoint workflow tương ứng trong package scripts:
 | `npm run workflow:timeoff:prepare` | Nhận JSON stdin `{ "skipDates": [...] }` và tạo plan có digest. |
 | `npm run workflow:timeoff:create` | Nhận plan đã được preview/confirm qua JSON stdin và tạo các đơn đã chọn. |
 
-### Bước 2: Tạo đơn tự động
-Bạn có thể chọn chạy trọn gói (All-in-one) hoặc chạy theo từng chế độ riêng biệt.
+### Bước 2: Tạo đơn
 
-#### 1. Chạy trọn gói (Khuyên dùng)
-Dành cho trường hợp muốn thực hiện nhanh toàn bộ quy trình (Sync -> Create -> Verify).
-- **Chạy ẩn (Headless)**: `npm run run`
-- **Chạy hiện trình duyệt**: `npm run run:show`
+| Lệnh | Đặc điểm |
+| :--- | :--- |
+| `npm run run` | Trọn gói: `data:sync` rồi `off:create`. |
+| `npm run off:create -- --dry-run` | Điền và kiểm tra toàn bộ, **không lưu**. Nên chạy trước lần tạo thật. |
+| `npm run off:create` | Tạo đơn đi trễ cho các ngày trong `action-needed.json`, mỗi đơn được đọc lại theo id. |
+| `npm run off:fullday -- 18/09/2026 [--reason "..."] [--dry-run]` | Tạo đơn nghỉ cả ngày (08:00 → 17:00). |
+| `npm run off:verify` | Bỏ khỏi `action-needed.json` những ngày đã có đơn trên Bemo. |
 
-#### 2. Các chế độ tùy chọn
-Dành cho nhu cầu kiểm soát kỹ hơn từng đơn hoặc khi hệ thống có thay đổi.
-
-| Chế độ | Lệnh | Đặc điểm |
-| :--- | :--- | :--- |
-| **Tiêu chuẩn** | `npm run off:create` | Tạo xong đơn nào xác thực đơn đó. Chậm nhưng an toàn. |
-| **Nhanh** | `npm run off:fast` | Tạo liên tục không đợi xác thực. Tốt nhất cho số lượng lớn (>5 đơn). |
-| **Thủ công** | `npm run off:manual` | Script điền sẵn form, bạn tự kiểm tra và nhấn Save. |
-| **Xác thực** | `npm run off:verify` | Quét lại toàn bộ đơn để dọn dẹp danh sách chờ. |
+Mã thoát khác 0 khi có đơn lỗi hoặc đơn **đã lưu nhưng sai** (in kèm id để kiểm tra trên Bemo).
 
 ### ⚙️ Lệnh bổ trợ khác
 - `npm run auth`: Đăng nhập lại nếu bị hết hạn session.
 
 ## 🔒 Cơ chế bảo vệ & Logic nghiệp vụ
 
-- **Ưu tiên phép (FIFO)**: Luôn sử dụng Annual Leave của các năm cũ nhất trước để tránh hết hạn phép.
-- **Kiểm tra số dư**: Script sẽ báo lỗi và bỏ qua nếu số dư phép không đủ cho số giờ nghỉ.
-- **Ràng buộc thời gian**: Chỉ tạo đơn cho những ngày đi trễ vượt quá `minLateMinutes` (mặc định 7p) trong `config.js`.
-- **Chống trùng lặp**: File `action-needed.json` chỉ được dọn dẹp khi đơn đã được xác nhận tồn tại trên hệ thống Bemo.
+Mọi luật nghiệp vụ nằm ở `src/business-rules.js`.
+
+- **Thứ tự loại phép**: `leaveTypePriority` (mặc định Annual Leave rồi Compensatory Leave); cùng loại thì dùng năm cũ trước; phải còn đủ số giờ.
+- **Luật cứng trước khi lưu** (không có cờ bỏ qua): ngày làm việc; đơn bắt đầu 08:00; đi trễ 7–60 phút và kết thúc trước 12:00; khớp giờ check-in và số phút trễ Bemo ghi nhận; tổng nghỉ trong ngày ≤ giờ làm việc (8h); không ở tương lai hoặc cũ hơn tháng trước; trạng thái chờ duyệt; đúng nhân viên đang đăng nhập; nghỉ cả ngày thì ngày đó không có chấm công.
+- **Chống trùng lặp**: bỏ qua nếu đã có đơn còn hiệu lực trùng khung giờ; chỉ một lần tạo đơn chạy tại một thời điểm (khoá `data/.create-timeoff.lock`).
 
 ## 🐛 Xử lý sự cố (Troubleshooting)
 
 - **Lỗi Login**: Chạy `npm run auth` để cập nhật lại session.
 - **Lỗi lệch dữ liệu**: Nếu thấy danh sách tạo đơn không đúng, hãy chạy lại Bước 1 (Đồng bộ dữ liệu).
-- **Lỗi Chrome**: Nếu script không tìm thấy trình duyệt, hãy đặt biến môi trường:
+- **Lỗi Chrome** (login, checkout, lấy cookie session): Nếu script không tìm thấy trình duyệt, hãy đặt biến môi trường:
   `export PUPPETEER_EXECUTABLE_PATH=/đường/dẫn/đến/chrome`
 
 ## 📄 License

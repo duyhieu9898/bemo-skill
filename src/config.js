@@ -80,23 +80,6 @@ function findChromePath() {
   );
 }
 
-/**
- * Column indices for table parsing
- * Update these if Bemo UI changes
- */
-const COLUMNS = {
-  attendance: {
-    checkIn: 5,
-    late: 9,
-  },
-  timeoff: {
-    type: 1,
-    startDate: 2,
-    endDate: 3,
-    status: 6,
-  },
-};
-
 module.exports = {
   // Paths (dynamic based on home directory)
   userDataDir: path.join(os.homedir(), ".puppeteer-profile"),
@@ -105,7 +88,6 @@ module.exports = {
   dataFiles: {
     attendance: path.join(DATA_DIR, "attendance-data.json"),
     timeoff: path.join(DATA_DIR, "timeoff-data.json"),
-    leaveTypes: path.join(DATA_DIR, "leave-types.json"),
     actionNeeded: path.join(DATA_DIR, "action-needed.json"),
   },
 
@@ -118,23 +100,11 @@ module.exports = {
     return this._chromePath;
   },
 
-  // Column indices for table parsing
-  columns: COLUMNS,
-
   // Bemo URLs
   urls: {
     login: `${BASE_URL}/web/login`,
-    attendances: `${BASE_URL}/web#action=390&cids=11%2C1&menu_id=192&model=hr.attendance&view_type=list`,
-    timeoffList: `${BASE_URL}/web#action=280&model=hr.leave&view_type=list&cids=&menu_id=202`,
     timeoffCreate: `${BASE_URL}/web#action=278&model=hr.leave&view_type=calendar&cids=&menu_id=202`,
     checkInOut: `${BASE_URL}/web#action=267&cids=&menu_id=192`,
-  },
-
-  // Attendance month filter options
-  attendanceFilters: {
-    current: "Current Month",
-    previous: "Previous Month",
-    default: "Current Month",
   },
 
   // Launch options

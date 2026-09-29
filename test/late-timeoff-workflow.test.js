@@ -72,7 +72,7 @@ test("executePlan passes only selected records to the create engine", async () =
 
   const result = await executePlan(plan, actionData, {
     now: new Date("2026-07-06T08:01:00.000Z"),
-    create: async (_headless, _manual, _skipVerify, records) => {
+    create: async (records) => {
       received = records;
       return { created: records, failed: [], skipped: [] };
     },
@@ -103,7 +103,7 @@ test("executePlan reports saved-but-unverified dates separately from failures", 
 
   const result = await executePlan(plan, actionData, {
     now: new Date("2026-07-06T08:01:00.000Z"),
-    create: async (_headless, _manual, _skipVerify, records) => ({
+    create: async (records) => ({
       created: records.slice(1),
       unverified: records.slice(0, 1),
       failed: [],

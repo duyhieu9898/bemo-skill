@@ -1,21 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const { updateSessionLeaveCache } = require("../src/timeoff/logic");
-
-test("updateSessionLeaveCache returns updated balances without mutating the input", () => {
-  const cache = [
-    { name: "Annual Leave 2026 - Hours", remaining: 1 },
-    { name: "Compensatory Leave 2026 - Hours", remaining: 4 },
-  ];
-
-  const updated = updateSessionLeaveCache(cache, "Annual Leave 2026 - Hours", 90);
-
-  assert.equal(updated[0].remaining, 0);
-  assert.equal(updated[1].remaining, 4);
-  assert.equal(cache[0].remaining, 1);
-});
-
 const { findSuitableLeaveType } = require("../src/timeoff/logic");
 
 const TYPES = [

@@ -100,9 +100,10 @@ function checkCommon(request, countedMinutes, { today, otherMinutesThatDay }) {
  * @param {Object} context - Checking context
  * @param {string} [context.today] - "YYYY-MM-DD" in the user's timezone
  * @param {number} [context.otherMinutesThatDay=0] - Active time off already on that day
+ * @param {Array<{checkIn: string, lateMinutes: number}>} context.attendance - That day's attendance on Bemo (required)
  * @returns {Array<string>} Violations (empty when safe)
  */
-function checkLateRequest(request, { today = systemToday(), otherMinutesThatDay = 0 } = {}) {
+function checkLateRequest(request, { today = systemToday(), otherMinutesThatDay = 0, attendance } = {}) {
   const { lunchStart } = BUSINESS.workSchedule;
   const { minMinutes: minLateMinutes, maxMinutes: maxLateMinutes } = BUSINESS.lateArrival;
   const { violations, start, end } = checkCommon(request, Math.max(request.lateMinutes || 0, 0), { today, otherMinutesThatDay });
@@ -117,6 +118,20 @@ function checkLateRequest(request, { today = systemToday(), otherMinutesThatDay 
   }
   if (!Number.isInteger(request.lateMinutes) || request.lateMinutes < minLateMinutes || request.lateMinutes > maxLateMinutes) {
     violations.push(`late minutes must be ${minLateMinutes}-${maxLateMinutes}, got ${request.lateMinutes}`);
+  }
+
+  // The request must match the real first check-in of that day, not just the (possibly stale) input file.
+  if (!Array.isArray(attendance)) {
+    violations.push("attendance was not checked");
+  } else if (attendance.length === 0) {
+    violations.push(`no attendance on ${request.date}`);
+  } else {
+    const first = attendance[0];
+    const endTime = request.end.slice(11, 16);
+    if (first.checkIn !== endTime) violations.push(`first check-in is ${first.checkIn}, request ends at ${endTime}`);
+    if (first.lateMinutes !== request.lateMinutes) {
+      violations.push(`Bemo counts ${first.lateMinutes} late mins, request has ${request.lateMinutes}`);
+    }
   }
 
   return violations;

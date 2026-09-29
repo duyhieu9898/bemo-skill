@@ -8,6 +8,7 @@ const BUSINESS = require("../business-rules");
 const { extractTimeFromDateTime, createTimeOffLogger: log, debugLog: _debugLog } = require("../utils");
 const { findSuitableLeaveType } = require("../timeoff/logic");
 const { removeFromActionFile } = require("../timeoff/action-file");
+const { withCreateLock } = require("../timeoff/lock");
 const { connect } = require("./client");
 const { createFormSession } = require("./form");
 const { checkLateRequest, checkFullDayRequest, checkRun, assertSafe, workMinutesPerDay } = require("../timeoff/safety");
@@ -115,18 +116,22 @@ async function employeeBelongsToUser(conn, employeeId) {
 }
 
 /**
- * Whether the employee has any attendance starting on that local day
- * @returns {Promise<boolean>}
+ * Attendance of the employee starting on that local day, as the list view shows it
+ * @returns {Promise<Array<{checkIn: string, lateMinutes: number}>>} checkIn is local "HH:MM"
  */
-async function hasAttendanceOnDay(conn, employeeId, date) {
+async function findAttendanceOnDay(conn, employeeId, date) {
   const dayStart = localDisplayToOdoo(`${date} 00:00`, conn.tz);
   const dayEnd = formatOdooDatetime(parseOdooDatetime(dayStart) + 24 * 3600 * 1000);
-  const count = await conn.rpc.callKw("hr.attendance", "search_count", [[
-    ["employee_id", "=", employeeId],
-    ["check_in", ">=", dayStart],
-    ["check_in", "<", dayEnd],
-  ]], { context: conn.context });
-  return count > 0;
+  const rows = await conn.rpc.callKw("hr.attendance", "search_read", [], {
+    domain: [["employee_id", "=", employeeId], ["check_in", ">=", dayStart], ["check_in", "<", dayEnd]],
+    fields: ["check_in", "hours_arrive_late"],
+    order: "check_in asc",
+    context: conn.context,
+  });
+  return rows.map((row) => ({
+    checkIn: extractTimeFromDateTime(odooToLocalDisplay(row.check_in, conn.tz)),
+    lateMinutes: Math.round((row.hours_arrive_late || 0) * 60),
+  }));
 }
 
 /**
@@ -222,19 +227,25 @@ async function submitLeaveRequest(conn, arch, request, { dryRun = false, today =
   const [saved] = await conn.rpc.callKw(MODEL, "read", [[id], ["state", "date_from", "date_to", "holiday_status_id", "number_of_minutes_display"]], {
     context: conn.context,
   });
-  const verified =
-    Boolean(saved) &&
-    !INACTIVE_STATES.includes(saved.state) &&
-    saved.date_from === dateFrom &&
-    saved.date_to === dateTo &&
-    saved.holiday_status_id?.[0] === leaveType.id &&
-    saved.number_of_minutes_display === minutes;
-  debugLog("rpc_create_saved", { date, id, saved, verified });
+  const mismatches = [];
+  if (!saved) mismatches.push("record not readable");
+  else {
+    if (INACTIVE_STATES.includes(saved.state)) mismatches.push(`state=${saved.state}`);
+    if (saved.date_from !== dateFrom) mismatches.push(`date_from=${saved.date_from} (sent ${dateFrom})`);
+    if (saved.date_to !== dateTo) mismatches.push(`date_to=${saved.date_to} (sent ${dateTo})`);
+    if (saved.holiday_status_id?.[0] !== leaveType.id) mismatches.push(`type=${saved.holiday_status_id?.[1]} (sent ${leaveType.name})`);
+    if (saved.number_of_minutes_display !== minutes) mismatches.push(`minutes=${saved.number_of_minutes_display} (sent ${minutes})`);
+  }
+  debugLog("rpc_create_saved", { date, id, saved, mismatches });
 
   const result = { date, canonicalDate: request.canonicalDate, id, start, end, reason, leaveType: leaveType.name };
-  if (verified) log.verified();
-  else log.unverified(date);
-  return { status: verified ? "created" : "unverified", ...result, saved };
+  if (!mismatches.length) {
+    log.verified(id);
+    return { status: "created", ...result, saved };
+  }
+  // The record exists on Bemo but differs from what was sent: never delete it automatically.
+  log.unverified(date, id, mismatches);
+  return { status: "unverified", ...result, saved, mismatches };
 }
 
 /**
@@ -259,7 +270,10 @@ async function createLateTimeOff(conn, arch, record, options = {}) {
       minutes: lateMinutes,
       reason: record.reason || BUSINESS.lateArrival.defaultReason,
       checkSafety: async (saved) =>
-        checkLateRequest({ date, start: saved.start, end: saved.end, lateMinutes }, saved),
+        checkLateRequest(
+          { date, start: saved.start, end: saved.end, lateMinutes },
+          { ...saved, attendance: await findAttendanceOnDay(conn, saved.employeeId, date) },
+        ),
     },
     options,
   );
@@ -287,7 +301,7 @@ async function createFullDayTimeOff(conn, arch, record, options = {}) {
       checkSafety: async (saved) =>
         checkFullDayRequest(
           { date, start: saved.start, end: saved.end, minutes: saved.minutes },
-          { ...saved, hasAttendance: await hasAttendanceOnDay(conn, saved.employeeId, date) },
+          { ...saved, hasAttendance: (await findAttendanceOnDay(conn, saved.employeeId, date)).length > 0 },
         ),
     },
     options,
@@ -301,9 +315,10 @@ async function createFullDayTimeOff(conn, arch, record, options = {}) {
  * @param {boolean} [options.dryRun=false] - Validate without creating
  * @param {Object} [options.conn] - Existing connection (tests)
  * @param {boolean} [options.updateActionFile=true] - Remove handled dates from action-needed.json
+ * @param {string} [options.lockFile] - Lock file path (tests)
  * @returns {Promise<{created: Array, unverified: Array, failed: Array, skipped: Array, dryRun: Array}>}
  */
-async function createTimeOffViaApi(records, { dryRun = false, conn = null, updateActionFile = true } = {}) {
+async function createTimeOffViaApi(records, { dryRun = false, conn = null, updateActionFile = true, lockFile } = {}) {
   const summary = { created: [], unverified: [], failed: [], skipped: [], dryRun: [] };
   if (!records.length) {
     log.nothingToCreate();
@@ -311,9 +326,15 @@ async function createTimeOffViaApi(records, { dryRun = false, conn = null, updat
   }
   assertSafe(checkRun(records), "run");
 
+  // Dry runs write nothing, so they may run next to a real one.
+  const run = () => runBatch(records, summary, { dryRun, conn, updateActionFile });
+  return dryRun ? run() : withCreateLock(run, lockFile ? { lockFile } : {});
+}
+
+async function runBatch(records, summary, { dryRun, conn, updateActionFile }) {
   const connection = conn || (await connect());
   const arch = await loadDialogFormArch(connection);
-  log.modeInfo(records.length, false);
+  log.modeInfo(records.length);
 
   for (const record of records) {
     try {
@@ -347,6 +368,7 @@ module.exports = {
   createTimeOffViaApi,
   createLateTimeOff,
   createFullDayTimeOff,
+  findActiveLeavesOnDay,
   fetchLeaveTypes,
   loadDialogFormArch,
 };

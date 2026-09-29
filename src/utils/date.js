@@ -13,16 +13,6 @@ function parseDate(dateStr) {
 }
 
 /**
- * Parse time string to minutes
- * @param {string} timeStr - Time string in HH:MM format
- * @returns {number} Total minutes
- */
-function parseTimeToMinutes(timeStr) {
-  const match = timeStr?.match(/(\d+):(\d+)/);
-  return match ? parseInt(match[1]) * 60 + parseInt(match[2]) : 0;
-}
-
-/**
  * Get filter months for current and previous month
  * @returns {Array<{month: number, year: number}>}
  */
@@ -85,7 +75,6 @@ function extractTimeFromDateTime(dateTimeStr) {
 
 module.exports = {
   parseDate,
-  parseTimeToMinutes,
   getFilterMonths,
   isInFilterMonths,
   formatDate,

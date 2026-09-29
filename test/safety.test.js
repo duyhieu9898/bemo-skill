@@ -4,10 +4,12 @@ const assert = require("node:assert/strict");
 const { checkLateRequest, checkRun } = require("../src/timeoff/safety");
 
 const TODAY = "2026-09-29";
+// Attendance that matches a late request exactly (first check-in = end time)
+const att = (request) => [{ checkIn: request.end.slice(11, 16), lateMinutes: request.lateMinutes }];
 const ok = { date: "25/09/2026", start: "25/09/2026 08:00", end: "25/09/2026 08:37", lateMinutes: 37 };
 
 test("a normal late request passes", () => {
-  assert.deepEqual(checkLateRequest(ok, { today: TODAY }), []);
+  assert.deepEqual(checkLateRequest(ok, { today: TODAY, attendance: att(ok) }), []);
 });
 
 test("rejects more than 8 hours of time off on one day", () => {
@@ -35,7 +37,7 @@ test("rejects future dates and dates before the previous month", () => {
   const old = { date: "31/07/2026", start: "31/07/2026 08:00", end: "31/07/2026 08:10", lateMinutes: 10 };
   assert.ok(checkLateRequest(old, { today: TODAY }).some((v) => /older than the previous month/.test(v)));
   const lastMonth = { date: "03/08/2026", start: "03/08/2026 08:00", end: "03/08/2026 08:10", lateMinutes: 10 };
-  assert.deepEqual(checkLateRequest(lastMonth, { today: TODAY }), []);
+  assert.deepEqual(checkLateRequest(lastMonth, { today: TODAY, attendance: att(lastMonth) }), []);
 });
 
 test("run checks catch duplicates and oversized batches", () => {
@@ -52,7 +54,7 @@ test("late time off must end by lunch", () => {
     BUSINESS.workSchedule.lunchStart = "08:30";
     assert.ok(checkLateRequest(request, { today: TODAY }).some((v) => /must end by lunch \(08:30\)/.test(v)));
     BUSINESS.workSchedule.lunchStart = "12:00";
-    assert.deepEqual(checkLateRequest(request, { today: TODAY }), []);
+    assert.deepEqual(checkLateRequest(request, { today: TODAY, attendance: att(request) }), []);
   } finally {
     BUSINESS.workSchedule.lunchStart = original;
   }
@@ -63,4 +65,13 @@ test("rejects weekends and derives the daily cap from the schedule", () => {
   assert.ok(checkLateRequest(saturday, { today: TODAY }).some((v) => /26\/09\/2026 is not a working day/.test(v)));
   const { workMinutesPerDay } = require("../src/timeoff/safety");
   assert.equal(workMinutesPerDay({ start: "08:00", lunchStart: "12:00", lunchEnd: "13:00", end: "17:00" }), 480);
+});
+
+test("late request must match Bemo's first check-in and late minutes", () => {
+  assert.ok(checkLateRequest(ok, { today: TODAY }).some((v) => /attendance was not checked/.test(v)));
+  assert.ok(checkLateRequest(ok, { today: TODAY, attendance: [] }).some((v) => /no attendance on 25\/09\/2026/.test(v)));
+  const moved = [{ checkIn: "08:40", lateMinutes: 40 }];
+  const violations = checkLateRequest(ok, { today: TODAY, attendance: moved });
+  assert.ok(violations.some((v) => /first check-in is 08:40, request ends at 08:37/.test(v)));
+  assert.ok(violations.some((v) => /Bemo counts 40 late mins, request has 37/.test(v)));
 });

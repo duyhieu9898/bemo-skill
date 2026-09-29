@@ -48,35 +48,7 @@ function findSuitableLeaveType(allLeaveTypes, requiredHours, priority = BUSINESS
   return suitableType;
 }
 
-/**
- * Update the session cache after a successful creation
- * @param {Array} cache - The in-memory cache array
- * @param {string} typeName - Name of the leave type used
- * @param {number} usedMinutes - Minutes used
- * @returns {Array} Updated cache
- */
-function updateSessionLeaveCache(cache, typeName, usedMinutes) {
-  if (!cache) return null;
-  
-  const usedHours = usedMinutes / 60;
-  // Copy the updated entry too, so callers holding the old array are not mutated.
-  const updatedCache = cache.map((t) =>
-    t.name === typeName ? { ...t, remaining: Math.max(0, t.remaining - usedHours) } : t,
-  );
-  const updated = updatedCache.find((t) => t.name === typeName);
-
-  if (updated) {
-    debugLog("create-timeoff.json", "updated_session_cache", {
-      type: typeName,
-      newBalance: updated.remaining,
-    });
-  }
-
-  return updatedCache;
-}
-
 module.exports = {
   extractYearFromLeaveType,
   findSuitableLeaveType,
-  updateSessionLeaveCache
 };

@@ -21,12 +21,13 @@ Dùng skill này khi user muốn thao tác với Bemo Cloud, bao gồm attendanc
 ## Ngữ Cảnh Quan Trọng
 
 - Đây là project Node.js.
-- Đọc dữ liệu và tạo time-off mặc định qua Odoo JSON-RPC (`src/rpc/`), dùng lại session cookie
-  trong Chrome profile. Thêm `--browser` để dùng engine scrape giao diện cũ.
+- Đọc dữ liệu và tạo time-off qua Odoo JSON-RPC (`src/rpc/`), dùng lại session cookie
+  trong Chrome profile.
 - Checkout và login vẫn dùng browser (`puppeteer-core`) vì Bemo gửi GPS/payload mã hoá khi chấm công.
 - Tạo time-off qua API phát lại đúng dialog của UI (form view lấy từ calendar `form_view_id`, onchange
   theo thứ tự mở form → loại phép → `date_to` → `date_from`), bỏ qua nếu đã có đơn active trùng khung giờ,
-  và đọc lại record theo id để xác minh. `node src/create-timeoff.js --dry-run` điền + validate mà không tạo.
+  và đọc lại record theo id để xác minh. `npm run off:create -- --dry-run` điền + validate mà không tạo.
+- Đơn "SAVED but differs" đã nằm trên Bemo: báo user kiểm tra id đó, không tạo lại, không tự xoá.
 - Nghỉ cả ngày: `npm run off:fullday -- DD/MM/YYYY [--reason "..."] [--dry-run]` (08:00 → 17:00, server tính 8h).
   Bị chặn nếu ngày đó có chấm công, không phải ngày làm việc, hoặc đã có đơn trùng giờ.
 - Business rules (lịch làm việc, ngưỡng đi trễ, thứ tự loại phép, giới hạn an toàn) chỉ nằm ở
@@ -48,7 +49,8 @@ Dùng skill này khi user muốn thao tác với Bemo Cloud, bao gồm attendanc
 - Compare logic: `{baseDir}/src/compare.js`
 - Time-off creation: `{baseDir}/src/create-timeoff.js` (API engine: `{baseDir}/src/rpc/create-leave.js`)
 - Odoo JSON-RPC client, form emulation, sync: `{baseDir}/src/rpc/`
-- Time-off verification: `{baseDir}/src/verify-timeoff.js`
+- Time-off verification (dọn action-needed): `{baseDir}/src/verify-timeoff.js`
+- Luật an toàn, chọn loại phép, khoá: `{baseDir}/src/timeoff/`
 - Late-day time-off workflow wrapper: `{baseDir}/src/workflows/late-timeoff.js`
 - Cron Telegram runner: `{baseDir}/scripts/run-cron-telegram.js`
 - Cron setup: `{baseDir}/scripts/setup-cron.sh`

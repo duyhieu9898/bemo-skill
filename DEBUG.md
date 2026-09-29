@@ -14,7 +14,7 @@ Hệ thống lưu trữ log tại thư mục `logs/`:
 2.  **`logs/create-timeoff.json`**:
     - **Đặc điểm**: Chứa dữ liệu kỹ thuật chi tiết dưới dạng JSON (bao gồm biến số, kết quả từ trình duyệt).
     - **Khi nào dùng**: Khi cần debug sâu tại sao một bước cụ thể (như điền form hay chọn loại phép) bị lỗi.
-    - **Nội dung**: `timestamp`, `action`, và các data trả về từ Puppeteer.
+    - **Nội dung**: `timestamp`, `action`, và dữ liệu gửi/nhận qua JSON-RPC.
 
 ---
 
@@ -22,40 +22,42 @@ Hệ thống lưu trữ log tại thư mục `logs/`:
 
 ### 1. Lỗi "Not logged in"
 *   **Dấu hiệu**: Xuất hiện ngay khi bắt đầu chạy các script lấy dữ liệu hoặc tạo đơn.
-*   **Nguyên nhân**: Session Chrome đã hết hạn hoặc file profile bị lỗi.
-*   **Cách sửa**: Chạy `node src/login.js` để đăng nhập lại thủ công.
+*   **Nguyên nhân**: Session Bemo (cookie trong Chrome profile) đã hết hạn.
+*   **Cách sửa**: Chạy `npm run auth`.
 
-### 2. Lỗi "Insufficient Annual Leave balance"
-*   **Dấu hiệu**: Script báo bỏ qua (skip) một ngày cụ thể.
-*   **Kiểm tra**: Mở `logs/create-timeoff.json`, tìm action `checkLeaveBalance_start`. Xem danh sách `extractedTypes` để biết thực tế Bemo đang báo bạn còn bao nhiêu phép cho từng năm.
-*   **Nguyên nhân**: Số giờ phép còn lại ít hơn số giờ bạn đi trễ.
+### 2. Lỗi "Insufficient balance in ..."
+*   **Dấu hiệu**: Script bỏ qua (skip) một ngày cụ thể.
+*   **Kiểm tra**: Dòng "Available leave types" trong output cho biết số giờ còn lại (đã trừ các đơn đang chờ duyệt).
+*   **Nguyên nhân**: Không loại nào trong `leaveTypePriority` còn đủ số giờ.
 
-### 3. Lỗi "Form fill failed" hoặc "Form date mismatch"
-*   **Dấu hiệu**: Script dừng lại khi đang điền đơn.
-*   **Kiểm tra**: Xem `logs/create-timeoff.json` phần `fillResult`. Nếu `start` hoặc `end` là `false`, nghĩa là CSS Selector của ô ngày tháng đã thay đổi.
-*   **Cách sửa**: Kiểm tra lại các selector trong `src/timeoff/form.js`.
+### 3. Lỗi "Form validation failed"
+*   **Dấu hiệu**: Dừng trước khi lưu, không có gì được tạo.
+*   **Nguyên nhân thường gặp**:
+    - `onchange warning: You were attendance from ...`: chính Bemo từ chối vì trùng giờ đã chấm công.
+    - `duration is X mins, expected Y`: server tính thời lượng khác (ví dụ ngày cuối tuần tính 0 phút).
+    - `leave type was reset`/`required fields empty`: form trên Bemo đã thay đổi, xem `rpc_form_view` và `rpc_create_values` trong log.
 
-### 4. Lỗi "Duration validation failed"
-*   **Dấu hiệu**: Script điền xong nhưng không nhấn Save vì số phút nghỉ không khớp.
-*   **Kiểm tra**: Xem `logs/create-timeoff.json` phần `durationValidation`. 
-*   **Nguyên nhân**: 
-    - Thường do Bemo tính toán thời gian nghỉ khác với logic của script (ví dụ: trừ giờ nghỉ trưa hoặc quy định làm tròn).
-    - Đi trễ quá lâu (> 60 phút) vượt quá giới hạn an toàn (`maxLateMinutes`).
+### 4. Lỗi "Safety rule violated"
+*   **Dấu hiệu**: Dừng trước khi lưu. Thông báo liệt kê từng luật bị vi phạm.
+*   **Cách sửa**: Thường do `action-needed.json` cũ: chạy lại `npm run data:sync`. Luật nằm ở `src/business-rules.js` và `src/timeoff/safety.js`.
+
+### 5. "SAVED but differs from the request"
+*   **Dấu hiệu**: Đơn **đã được tạo** nhưng đọc lại thấy khác (in kèm `#id`).
+*   **Cách xử lý**: Mở đơn `#id` trên Bemo, sửa hoặc huỷ bằng tay. **Không tạo lại** ngày đó.
+
+### 6. "Another time off creation is running"
+*   Một lần tạo đơn khác đang chạy. Nếu chắc chắn không còn tiến trình nào, xoá `data/.create-timeoff.lock` (khoá của tiến trình đã chết sẽ tự được giải phóng).
 
 ---
 
-## 📺 Kỹ thuật Debug trực quan (Visual Debug)
-
-Nếu đọc log vẫn chưa hiểu chuyện gì đang xảy ra, hãy sử dụng flag `--show`:
+## 🧪 Chạy thử không lưu
 
 ```bash
-node src/create-timeoff.js --show
+npm run off:create -- --dry-run
+npm run off:fullday -- 18/09/2026 --dry-run
 ```
 
-**Các bước debug trực quan:**
-1.  Quan sát trình duyệt xem script có click đúng ô dropdown không.
-2.  Xem các giá trị ngày tháng có được điền đúng định dạng không.
-3.  Khi script dừng lại (do lỗi), hãy giữ nguyên trình duyệt và dùng **F12 (Inspect Element)** để kiểm tra các class CSS xem có thay đổi không so với code trong `src/timeoff/ui.js` và `src/timeoff/form.js`.
+Chạy toàn bộ các bước (mở form, chọn loại phép, onchange, luật an toàn) và in giá trị sẽ gửi lên, nhưng không gọi `create`.
 
 ---
 
@@ -71,10 +73,12 @@ Mỗi entry trong `create-timeoff.json` thường có cấu trúc:
 ```
 
 **Các `action` quan trọng cần chú ý:**
-- `getLeaveTypes_end`: Dữ liệu thô quét được từ dropdown loại phép.
-- `selectLeaveType_action`: Kết quả click chọn loại phép.
-- `form_fill_duration_wait_timeout`: Nếu thấy action này, nghĩa là trang web phản hồi quá chậm sau khi điền ngày tháng.
-- `createOne_navigation_error`: Lỗi khi nhấn nút "New" hoặc tải trang tạo mới.
+- `rpc_form_view`: form view mà dialog tạo đơn đang dùng.
+- `rpc_create_start`: khung giờ (UTC) chuẩn bị tạo.
+- `rpc_create_exists`: bỏ qua vì đã có đơn trùng giờ.
+- `rpc_create_values`: giá trị chính xác gửi lên `create`.
+- `rpc_create_saved`: đơn đã tạo (`id`) và kết quả đọc lại (`mismatches`).
+- `rpc_create_failed`: lỗi của từng ngày.
 
 ## ♻️ Lưu ý về dọn dẹp Log
 File JSON log sẽ tự động giữ lại **1000 dòng mới nhất** để tránh làm đầy đĩa cứng của bạn. Nếu cần bắt đầu lại từ đầu, bạn có thể xóa file trong thư mục `logs/` bất cứ lúc nào.

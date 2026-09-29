@@ -125,13 +125,18 @@ function listLateRecords(actionData) {
 async function executePlan(plan, actionData, options = {}) {
   const validated = validatePlan(plan, actionData, options.now || new Date());
   const create = options.create || createTimeOff;
-  const summary = await create(true, false, false, validated.records);
+  const summary = await create(validated.records);
   return {
     sourceDigest: validated.sourceDigest,
     skippedDates: validated.skippedDates,
     selectedDates: validated.createDates,
     createdDates: summary.created.map((record) => normalizeDate(record.canonicalDate || record.date)),
     unverifiedDates: (summary.unverified || []).map((record) => normalizeDate(record.canonicalDate || record.date)),
+    unverified: (summary.unverified || []).map((record) => ({
+      date: normalizeDate(record.canonicalDate || record.date),
+      id: record.id,
+      mismatches: record.mismatches || [],
+    })),
     failed: summary.failed.map((item) => ({ ...item, date: normalizeDate(item.date) })),
     skipped: summary.skipped.map((item) => ({ ...item, date: normalizeDate(item.date) })),
   };
@@ -164,10 +169,9 @@ async function main() {
     const plan = await readStdinJson();
     const result = await executePlan(plan, actionData);
     process.stdout.write(`BEMO_WORKFLOW_RESULT=${JSON.stringify(result)}\n`);
-    if (result.unverifiedDates.length) {
-      console.error(
-        `Saved but unverified: ${result.unverifiedDates.join(", ")}. Run data:sync before retrying to avoid duplicates.`,
-      );
+    if (result.unverified.length) {
+      const detail = result.unverified.map((u) => `#${u.id} ${u.date}: ${u.mismatches.join("; ")}`).join(" | ");
+      throw new Error(`Saved but differs from the request, check in Bemo and do NOT recreate: ${detail}`);
     }
     if (result.failed.length) throw new Error(`${result.failed.length} selected time-off request(s) failed.`);
     return;
