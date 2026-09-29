@@ -24,6 +24,9 @@ module.exports = {
   // Full-day leave (workSchedule.start -> workSchedule.end)
   fullDayLeave: {
     defaultReason: "em xin nghỉ phép cả ngày vì lý do cá nhân ạ",
+    // No single leave type has 8h: split the day over several types in priority order
+    // (e.g. 08:00-15:40 Annual + 15:40-17:00 Compensatory). false = skip the day instead.
+    splitAcrossLeaveTypes: true,
   },
 
   // Leave type choice: first entry with enough balance wins.

@@ -75,3 +75,26 @@ test("late request must match Bemo's first check-in and late minutes", () => {
   assert.ok(violations.some((v) => /first check-in is 08:40, request ends at 08:37/.test(v)));
   assert.ok(violations.some((v) => /Bemo counts 40 late mins, request has 37/.test(v)));
 });
+
+test("full day split must chain into exactly one working day", () => {
+  const { checkFullDaySplit } = require("../src/timeoff/safety");
+  const day = "18/09/2026";
+  const ok = [
+    { start: `${day} 08:00`, end: `${day} 15:40`, minutes: 400 },
+    { start: `${day} 15:40`, end: `${day} 17:00`, minutes: 80 },
+  ];
+  assert.deepEqual(checkFullDaySplit(day, ok, { today: TODAY }), []);
+
+  const aroundLunch = [
+    { start: `${day} 08:00`, end: `${day} 12:00`, minutes: 240 },
+    { start: `${day} 13:00`, end: `${day} 17:00`, minutes: 240 },
+  ];
+  assert.deepEqual(checkFullDaySplit(day, aroundLunch, { today: TODAY }), []);
+
+  const gap = [{ ...ok[0], end: `${day} 15:30`, minutes: 390 }, ok[1]];
+  const violations = checkFullDaySplit(day, gap, { today: TODAY });
+  assert.ok(violations.some((v) => /part 2 starts at 15:40, previous ends at 15:30/.test(v)));
+  assert.ok(violations.some((v) => /full day counts 470 mins, expected 480/.test(v)));
+
+  assert.ok(checkFullDaySplit(day, ok, { today: TODAY, hasAttendance: true }).some((v) => /has attendance/.test(v)));
+});

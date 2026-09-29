@@ -159,6 +159,11 @@ const createTimeOffLogger = {
     });
   },
 
+  splitPlan: (parts) => {
+    baseLog.indent(`${ICONS.success} No single leave type has enough balance, splitting the day:`);
+    parts.forEach((p) => baseLog.indent(`- ${p.start} → ${p.end}: ${p.name} (${p.minutes} mins)`, 2));
+  },
+
   selectedType: (type) => {
     baseLog.indent(`${ICONS.success} Selected: ${type.name} (${type.remaining}h available)`);
   },

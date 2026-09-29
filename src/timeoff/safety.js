@@ -123,6 +123,33 @@ function checkFullDayRequest(request, { today = systemToday(), otherMinutesThatD
 }
 
 /**
+ * Check a full day split over several leave types: the parts must chain without gaps or overlaps
+ * (lunch excepted) and together be exactly one full day.
+ * @param {string} date - "DD/MM/YYYY"
+ * @param {Array<{start: string, end: string, minutes: number}>} parts - Server-computed values, in order
+ * @param {Object} context - {today, otherMinutesThatDay, hasAttendance}
+ * @returns {Array<string>} Violations
+ */
+function checkFullDaySplit(date, parts, context = {}) {
+  const { lunchStart, lunchEnd } = BUSINESS.workSchedule;
+  if (parts.length < 2) return [`a split needs at least 2 parts, got ${parts.length}`];
+
+  const total = parts.reduce((sum, p) => sum + p.minutes, 0);
+  const violations = checkFullDayRequest(
+    { date, start: parts[0].start, end: parts[parts.length - 1].end, minutes: total },
+    context,
+  );
+  for (let i = 1; i < parts.length; i++) {
+    const prevEnd = parts[i - 1].end.slice(11, 16);
+    const start = parts[i].start.slice(11, 16);
+    const acrossLunch = prevEnd === lunchStart && start === lunchEnd;
+    if (prevEnd !== start && !acrossLunch) violations.push(`part ${i + 1} starts at ${start}, previous ends at ${prevEnd}`);
+  }
+  if (parts.some((p) => p.minutes <= 0)) violations.push("every part must count more than 0 mins");
+  return violations;
+}
+
+/**
  * Check a whole run before touching Bemo
  * @param {Array<Object>} records - Records to create
  * @returns {Array<string>} Violations
@@ -154,6 +181,7 @@ function assertSafe(violations, scope) {
 module.exports = {
   checkLateRequest,
   checkFullDayRequest,
+  checkFullDaySplit,
   checkRun,
   assertSafe,
   workMinutesPerDay,

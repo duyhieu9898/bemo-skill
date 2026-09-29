@@ -100,6 +100,7 @@ Mã thoát khác 0 khi có đơn lỗi hoặc đơn **đã lưu nhưng sai** (in
 Mọi luật nghiệp vụ nằm ở `src/business-rules.js`.
 
 - **Thứ tự loại phép**: `leaveTypePriority` (mặc định Annual Leave rồi Compensatory Leave); cùng loại thì dùng năm cũ trước; phải còn đủ số giờ.
+- **Tách ngày nghỉ**: nếu không loại nào đủ 8h, đơn nghỉ cả ngày được tách theo thứ tự ưu tiên (vd 08:00–15:40 Annual + 15:40–17:00 Compensatory). Mọi phần được kiểm tra trước khi lưu phần đầu tiên. Tắt bằng `fullDayLeave.splitAcrossLeaveTypes: false`.
 - **Luật cứng trước khi lưu** (không có cờ bỏ qua): ngày làm việc; đơn bắt đầu 08:00; đi trễ 7–60 phút và kết thúc trước 12:00; khớp giờ check-in và số phút trễ Bemo ghi nhận; tổng nghỉ trong ngày ≤ giờ làm việc (8h); không ở tương lai hoặc cũ hơn tháng trước; trạng thái chờ duyệt; đúng nhân viên đang đăng nhập; nghỉ cả ngày thì ngày đó không có chấm công.
 - **Chống trùng lặp**: bỏ qua nếu đã có đơn còn hiệu lực trùng khung giờ; chỉ một lần tạo đơn chạy tại một thời điểm (khoá `data/.create-timeoff.lock`).
 

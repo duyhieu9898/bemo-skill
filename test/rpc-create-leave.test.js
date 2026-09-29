@@ -39,8 +39,11 @@ function fakeConn(overrides = {}) {
           } };
         }
         if (field === "date_from" && values.date_from && values.date_to) {
-          const wall = (Date.parse(values.date_to.replace(" ", "T") + "Z") - Date.parse(values.date_from.replace(" ", "T") + "Z")) / 60000;
-          const minutes = overrides.minutes ?? (wall === 540 ? 480 : wall);
+          const from = Date.parse(values.date_from.replace(" ", "T") + "Z");
+          const to = Date.parse(values.date_to.replace(" ", "T") + "Z");
+          const lunchFrom = Date.parse(values.date_from.slice(0, 10) + "T05:00:00Z");
+          const lunch = Math.max(0, Math.min(to, lunchFrom + 3600000) - Math.max(from, lunchFrom)) / 60000;
+          const minutes = overrides.minutes ?? (to - from) / 60000 - lunch;
           return { value: { division_id: [4, "Division"], number_of_minutes_display: minutes, number_of_hours_display: minutes / 60, number_of_days: minutes / 480 } };
         }
         return { value: {} };
@@ -53,13 +56,17 @@ function fakeConn(overrides = {}) {
       if (model === "hr.employee" && method === "read") return [{ id: 10, user_id: [overrides.employeeUser ?? 1, "User"] }];
       if (model === "hr.leave.type" && method === "search_read") return types;
       if (model === "hr.leave" && method === "create") {
-        Object.assign(saved, args[0]);
-        return 123;
+        const id = 123 + Object.keys(saved).length;
+        if (overrides.failCreateAt === Object.keys(saved).length) throw new Error("server refused");
+        saved[id] = args[0];
+        return id;
       }
       if (model === "hr.leave" && method === "read") {
-        return [{ id: 123, state: saved.state, date_from: saved.date_from, date_to: saved.date_to,
-          holiday_status_id: [saved.holiday_status_id, "type"],
-          number_of_minutes_display: overrides.savedMinutes ?? saved.number_of_minutes_display }];
+        const id = args[0][0];
+        const v = saved[id];
+        return [{ id, state: v.state, date_from: v.date_from, date_to: v.date_to,
+          holiday_status_id: [v.holiday_status_id, "type"],
+          number_of_minutes_display: overrides.savedMinutes ?? v.number_of_minutes_display }];
       }
       throw new Error(`unexpected ${model}.${method}`);
     },
@@ -161,15 +168,58 @@ test("full day: refused when that day has attendance", async () => {
   assert.equal(calls.some((c) => c.method === "create"), false);
 });
 
-test("full day: falls back to compensatory leave only if it has 8 hours, otherwise skips", async () => {
-  const { conn } = fakeConn({ attendance: [], types: [
+test("full day: splits over annual then compensatory leave when no single type has 8 hours", async () => {
+  const types = [
     { id: 44, name: "Annual Leave 2026 - Hours", request_unit: "hour", virtual_remaining_leaves: 6.67 },
     { id: 45, name: "Compensatory Leave 2026 - Hours", request_unit: "hour", virtual_remaining_leaves: 4 },
+  ];
+  const { conn, calls } = fakeConn({ attendance: [], types });
+  const result = await createFullDayTimeOff(conn, arch, fullDay, { today: TODAY });
+
+  assert.equal(result.status, "created");
+  assert.deepEqual(result.ids, [123, 124]);
+  const creates = calls.filter((c) => c.method === "create").map((c) => c.args[0]);
+  assert.deepEqual(creates.map((v) => [v.holiday_status_id, v.date_from, v.date_to, v.number_of_minutes_display]), [
+    [44, "2026-09-18 01:00:00", "2026-09-18 08:40:00", 400],
+    [45, "2026-09-18 08:40:00", "2026-09-18 10:00:00", 80],
+  ]);
+});
+
+test("full day: every part is validated before the first one is saved", async () => {
+  const types = [
+    { id: 44, name: "Annual Leave 2026 - Hours", request_unit: "hour", virtual_remaining_leaves: 6.67 },
+    { id: 45, name: "Compensatory Leave 2026 - Hours", request_unit: "hour", virtual_remaining_leaves: 4 },
+  ];
+  // Server counts 90 mins for the second part instead of 80: nothing may be created.
+  const { conn, calls } = fakeConn({ attendance: [], types });
+  const onchange = conn.rpc.callKw;
+  conn.rpc.callKw = async (model, method, args, kwargs) => {
+    const result = await onchange(model, method, args, kwargs);
+    if (method === "onchange" && args[2] === "date_from" && args[1].holiday_status_id === 45) result.value.number_of_minutes_display = 90;
+    return result;
+  };
+  await assert.rejects(createFullDayTimeOff(conn, arch, fullDay, { today: TODAY }), /duration is 90 mins, expected 80/);
+  assert.equal(calls.some((c) => c.method === "create"), false);
+});
+
+test("full day: a failure after the first part reports the saved id loudly", async () => {
+  const types = [
+    { id: 44, name: "Annual Leave 2026 - Hours", request_unit: "hour", virtual_remaining_leaves: 6.67 },
+    { id: 45, name: "Compensatory Leave 2026 - Hours", request_unit: "hour", virtual_remaining_leaves: 4 },
+  ];
+  const { conn } = fakeConn({ attendance: [], types, failCreateAt: 1 });
+  await assert.rejects(createFullDayTimeOff(conn, arch, fullDay, { today: TODAY }), /only partly created \(#123 saved\).*do NOT recreate/);
+});
+
+test("full day: skipped when even the split cannot cover 8 hours", async () => {
+  const { conn } = fakeConn({ attendance: [], types: [
+    { id: 44, name: "Annual Leave 2026 - Hours", request_unit: "hour", virtual_remaining_leaves: 2 },
+    { id: 45, name: "Compensatory Leave 2026 - Hours", request_unit: "hour", virtual_remaining_leaves: 1 },
   ] });
   const result = await createFullDayTimeOff(conn, arch, fullDay, { today: TODAY });
 
   assert.equal(result.status, "skipped");
-  assert.match(result.reason, /Required: 8h/);
+  assert.match(result.reason, /even when split/);
 });
 
 test("late: refused when Bemo's attendance does not match the request", async () => {
@@ -187,5 +237,5 @@ test("saved record that differs from the request is reported as unverified with 
 
   assert.equal(result.status, "unverified");
   assert.equal(result.id, 123);
-  assert.deepEqual(result.mismatches, ["minutes=60 (sent 15)"]);
+  assert.deepEqual(result.mismatches, ["#123 minutes=60 (sent 15)"]);
 });

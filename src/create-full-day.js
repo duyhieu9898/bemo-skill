@@ -31,7 +31,9 @@ async function main() {
 
   if (dryRun) {
     for (const item of summary.dryRun) {
-      console.log(`\n🧪 ${item.date}: would create ${item.leaveType.name} with ${JSON.stringify(item.createValues)}`);
+      for (const part of item.parts) {
+        console.log(`\n🧪 ${item.date}: would create ${part.leaveType} (${part.minutes} mins) with ${JSON.stringify(part.createValues)}`);
+      }
     }
   }
   if (summary.failed.length || summary.unverified.length) process.exit(1);

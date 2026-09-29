@@ -6,12 +6,19 @@
 const CONFIG = require("../config");
 const BUSINESS = require("../business-rules");
 const { extractTimeFromDateTime, createTimeOffLogger: log, debugLog: _debugLog } = require("../utils");
-const { findSuitableLeaveType } = require("../timeoff/logic");
+const { findSuitableLeaveType, planLeaveSplit, toWallClockRanges } = require("../timeoff/logic");
 const { removeFromActionFile } = require("../timeoff/action-file");
 const { withCreateLock } = require("../timeoff/lock");
 const { connect } = require("./client");
 const { createFormSession } = require("./form");
-const { checkLateRequest, checkFullDayRequest, checkRun, assertSafe, workMinutesPerDay } = require("../timeoff/safety");
+const {
+  checkLateRequest,
+  checkFullDayRequest,
+  checkFullDaySplit,
+  checkRun,
+  assertSafe,
+  workMinutesPerDay,
+} = require("../timeoff/safety");
 const {
   localDisplayToOdoo,
   localToday,
@@ -135,61 +142,26 @@ async function findAttendanceOnDay(conn, employeeId, date) {
 }
 
 /**
- * Fill, validate, create and read back one time off request, replaying the web client's dialog.
- * @param {Object} conn - Connection
- * @param {string} arch - Dialog form arch
- * @param {Object} request - What to create
- * @param {string} request.date - "DD/MM/YYYY"
- * @param {string} request.start - Local "DD/MM/YYYY HH:MM"
- * @param {string} request.end - Local "DD/MM/YYYY HH:MM"
- * @param {number} request.minutes - Minutes the server must count for it
- * @param {string} request.reason - Description
- * @param {function} request.checkSafety - async ({start, end, minutes, otherMinutesThatDay, employeeId, today}) => violations
- * @param {Object} options - {dryRun, today}
- * @returns {Promise<{status: string, ...}>} status: created | unverified | exists | skipped | dry-run
+ * Open the "New" dialog: the server fills employee, approvers, tz and the default type
+ * @returns {Promise<Object>} Form session
  */
-async function submitLeaveRequest(conn, arch, request, { dryRun = false, today = localToday(conn.tz) } = {}) {
-  const { date, start, end, minutes, reason, checkSafety } = request;
-  const requiredHours = Math.ceil((minutes / 60) * 100) / 100;
-  const dateFrom = localDisplayToOdoo(start, conn.tz);
-  const dateTo = localDisplayToOdoo(end, conn.tz);
-
-  log.createStart(date, extractTimeFromDateTime(end), minutes, requiredHours, extractTimeFromDateTime(start));
-  debugLog("rpc_create_start", { date, minutes, dateFrom, dateTo, dryRun });
-
-  // 1. Open the dialog: the server fills employee, approvers, tz and the default type.
+async function openForm(conn, arch) {
   const form = createFormSession(conn.rpc, MODEL, arch, conn.context);
   await form.open();
-  const employeeId = form.values.employee_id;
-  if (!employeeId) throw new Error("Form did not resolve the employee");
+  if (!form.values.employee_id) throw new Error("Form did not resolve the employee");
+  return form;
+}
 
-  // 2. Never create a second request over the same time range.
-  const dayLeaves = await findActiveLeavesOnDay(conn, employeeId, date);
-  const overlapping = dayLeaves.filter((l) => l.date_from < dateTo && l.date_to > dateFrom);
-  if (overlapping.length) {
-    debugLog("rpc_create_exists", { date, overlapping });
-    return { status: "exists", date, existing: overlapping };
-  }
-
-  // 3. Pick the leave type with the priority rules, from the same list the dropdown shows.
-  const hourTypes = (await fetchLeaveTypes(conn, employeeId)).filter((t) => t.requestUnit === "hour");
-  log.leaveTypes(hourTypes.filter((t) => t.remaining > 0));
-  let leaveType;
-  try {
-    leaveType = findSuitableLeaveType(hourTypes, requiredHours);
-  } catch (err) {
-    log.skipping(err.message);
-    return { status: "skipped", date, reason: err.message };
-  }
-  log.selectedType(leaveType);
-
-  // 4. Fill in the dialog order the UI uses; each onchange lets the server recompute dependent fields.
+/**
+ * Fill one part in the dialog order the UI uses and validate what the server computed
+ * @returns {Promise<Object>} The form's values
+ */
+async function fillPart(form, { employeeId, leaveType, dateFrom, dateTo, minutes, reason }) {
   await form.set("holiday_status_id", leaveType.id, { employee_id: employeeId, default_date_from: false });
   await form.set("date_to", dateTo);
   await form.set("date_from", dateFrom);
   await form.set("name", reason);
 
-  // 5. Validate what the server computed before saving.
   const values = form.values;
   const problems = [];
   if (form.warnings.length) problems.push(`onchange warning: ${form.warnings.map((w) => w.message || w.title).join("; ")}`);
@@ -204,25 +176,15 @@ async function submitLeaveRequest(conn, arch, request, { dryRun = false, today =
   if (missing.length) problems.push(`required fields empty: ${missing.join(", ")}`);
   if (problems.length) throw new Error(`Form validation failed: ${problems.join("; ")}`);
   log.durationValid(values.number_of_minutes_display);
+  return values;
+}
 
-  // 6. Hard safety rules on what would actually be saved (server-computed values).
-  const violations = await checkSafety({
-    start: odooToLocalDisplay(values.date_from, conn.tz),
-    end: odooToLocalDisplay(values.date_to, conn.tz),
-    minutes: values.number_of_minutes_display,
-    otherMinutesThatDay: dayLeaves.reduce((sum, l) => sum + minutesWithinDay(l), 0),
-    employeeId,
-    today,
-  });
-  if (!BUSINESS.safety.allowedStates.includes(values.state)) violations.push(`state would be "${values.state}"`);
-  if (!(await employeeBelongsToUser(conn, employeeId))) violations.push(`employee ${employeeId} is not the logged-in user`);
-  assertSafe(violations, date);
-
-  const createValues = form.createValues();
-  debugLog("rpc_create_values", { date, createValues });
-  if (dryRun) return { status: "dry-run", date, leaveType, createValues };
-
-  // 7. Create, then read the record back by id.
+/**
+ * Create one prepared part and read it back by id
+ * @returns {Promise<{id: number, saved: Object, mismatches: Array<string>}>}
+ */
+async function commitPart(conn, date, part) {
+  const createValues = part.form.createValues();
   const id = await conn.rpc.callKw(MODEL, "create", [createValues], { context: conn.context });
   const [saved] = await conn.rpc.callKw(MODEL, "read", [[id], ["state", "date_from", "date_to", "holiday_status_id", "number_of_minutes_display"]], {
     context: conn.context,
@@ -231,21 +193,153 @@ async function submitLeaveRequest(conn, arch, request, { dryRun = false, today =
   if (!saved) mismatches.push("record not readable");
   else {
     if (INACTIVE_STATES.includes(saved.state)) mismatches.push(`state=${saved.state}`);
-    if (saved.date_from !== dateFrom) mismatches.push(`date_from=${saved.date_from} (sent ${dateFrom})`);
-    if (saved.date_to !== dateTo) mismatches.push(`date_to=${saved.date_to} (sent ${dateTo})`);
-    if (saved.holiday_status_id?.[0] !== leaveType.id) mismatches.push(`type=${saved.holiday_status_id?.[1]} (sent ${leaveType.name})`);
-    if (saved.number_of_minutes_display !== minutes) mismatches.push(`minutes=${saved.number_of_minutes_display} (sent ${minutes})`);
+    if (saved.date_from !== part.dateFrom) mismatches.push(`date_from=${saved.date_from} (sent ${part.dateFrom})`);
+    if (saved.date_to !== part.dateTo) mismatches.push(`date_to=${saved.date_to} (sent ${part.dateTo})`);
+    if (saved.holiday_status_id?.[0] !== part.leaveType.id) {
+      mismatches.push(`type=${saved.holiday_status_id?.[1]} (sent ${part.leaveType.name})`);
+    }
+    if (saved.number_of_minutes_display !== part.minutes) {
+      mismatches.push(`minutes=${saved.number_of_minutes_display} (sent ${part.minutes})`);
+    }
   }
   debugLog("rpc_create_saved", { date, id, saved, mismatches });
+  return { id, saved, mismatches };
+}
 
-  const result = { date, canonicalDate: request.canonicalDate, id, start, end, reason, leaveType: leaveType.name };
-  if (!mismatches.length) {
-    log.verified(id);
-    return { status: "created", ...result, saved };
+/**
+ * Fill, validate, create and read back the time off for one day, replaying the web client's dialog.
+ * A day is one request, or (request.split) several consecutive requests over different leave types
+ * when no single type has enough balance. Every part is filled and checked before anything is saved.
+ * @param {Object} conn - Connection
+ * @param {string} arch - Dialog form arch
+ * @param {Object} request - What to create
+ * @param {string} request.date - "DD/MM/YYYY"
+ * @param {string} request.start - Local "DD/MM/YYYY HH:MM"
+ * @param {string} request.end - Local "DD/MM/YYYY HH:MM"
+ * @param {number} request.minutes - Minutes the server must count for the whole day's request
+ * @param {string} request.reason - Description
+ * @param {boolean} [request.split=false] - Allow splitting over several leave types
+ * @param {function} request.checkSafety - async ({parts, otherMinutesThatDay, employeeId, today}) => violations
+ * @param {Object} options - {dryRun, today}
+ * @returns {Promise<{status: string, ...}>} status: created | unverified | exists | skipped | dry-run
+ */
+async function submitLeaveRequest(conn, arch, request, { dryRun = false, today = localToday(conn.tz) } = {}) {
+  const { date, start, end, minutes, reason, checkSafety, split = false } = request;
+  const requiredHours = Math.ceil((minutes / 60) * 100) / 100;
+  const dateFrom = localDisplayToOdoo(start, conn.tz);
+  const dateTo = localDisplayToOdoo(end, conn.tz);
+
+  log.createStart(date, extractTimeFromDateTime(end), minutes, requiredHours, extractTimeFromDateTime(start));
+  debugLog("rpc_create_start", { date, minutes, dateFrom, dateTo, dryRun });
+
+  // 1. Open the dialog.
+  const firstForm = await openForm(conn, arch);
+  const employeeId = firstForm.values.employee_id;
+
+  // 2. Never create a second request over the same time range.
+  const dayLeaves = await findActiveLeavesOnDay(conn, employeeId, date);
+  const overlapping = dayLeaves.filter((l) => l.date_from < dateTo && l.date_to > dateFrom);
+  if (overlapping.length) {
+    debugLog("rpc_create_exists", { date, overlapping });
+    return { status: "exists", date, existing: overlapping };
   }
-  // The record exists on Bemo but differs from what was sent: never delete it automatically.
-  log.unverified(date, id, mismatches);
-  return { status: "unverified", ...result, saved, mismatches };
+
+  // 3. Pick leave type(s) with the priority rules, from the same list the dropdown shows.
+  const hourTypes = (await fetchLeaveTypes(conn, employeeId)).filter((t) => t.requestUnit === "hour");
+  log.leaveTypes(hourTypes.filter((t) => t.remaining > 0));
+  let plan;
+  try {
+    plan = split ? planLeaveSplit(hourTypes, minutes) : [{ type: findSuitableLeaveType(hourTypes, requiredHours), minutes }];
+  } catch (err) {
+    log.skipping(err.message);
+    return { status: "skipped", date, reason: err.message };
+  }
+  const ranges =
+    plan.length === 1
+      ? [{ start, end }]
+      : toWallClockRanges(plan.map((p) => p.minutes), BUSINESS.workSchedule).map((r) => ({
+          start: `${date} ${r.start}`,
+          end: `${date} ${r.end}`,
+        }));
+  if (plan.length === 1) log.selectedType(plan[0].type);
+  else log.splitPlan(plan.map((p, i) => ({ name: p.type.name, minutes: p.minutes, ...ranges[i] })));
+
+  // 4. Fill every part (one dialog each) before saving anything.
+  const parts = [];
+  for (let i = 0; i < plan.length; i++) {
+    const form = i === 0 ? firstForm : await openForm(conn, arch);
+    const part = {
+      form,
+      leaveType: plan[i].type,
+      minutes: plan[i].minutes,
+      dateFrom: localDisplayToOdoo(ranges[i].start, conn.tz),
+      dateTo: localDisplayToOdoo(ranges[i].end, conn.tz),
+    };
+    part.values = await fillPart(form, { ...part, employeeId, reason });
+    parts.push(part);
+  }
+
+  // 5. Hard safety rules on what would actually be saved (server-computed values).
+  const violations = await checkSafety({
+    parts: parts.map((p) => ({
+      start: odooToLocalDisplay(p.values.date_from, conn.tz),
+      end: odooToLocalDisplay(p.values.date_to, conn.tz),
+      minutes: p.values.number_of_minutes_display,
+    })),
+    otherMinutesThatDay: dayLeaves.reduce((sum, l) => sum + minutesWithinDay(l), 0),
+    employeeId,
+    today,
+  });
+  for (const p of parts) {
+    if (!BUSINESS.safety.allowedStates.includes(p.values.state)) violations.push(`state would be "${p.values.state}"`);
+  }
+  if (!(await employeeBelongsToUser(conn, employeeId))) violations.push(`employee ${employeeId} is not the logged-in user`);
+  assertSafe(violations, date);
+
+  const createValues = parts.map((p) => p.form.createValues());
+  debugLog("rpc_create_values", { date, createValues });
+  if (dryRun) {
+    return {
+      status: "dry-run",
+      date,
+      leaveType: parts[0].leaveType,
+      createValues: createValues[0],
+      parts: parts.map((p, i) => ({ leaveType: p.leaveType.name, minutes: p.minutes, createValues: createValues[i] })),
+    };
+  }
+
+  // 6. Create part by part, reading each back by id.
+  const committed = [];
+  for (const part of parts) {
+    try {
+      committed.push(await commitPart(conn, date, part));
+    } catch (err) {
+      if (!committed.length) throw err;
+      // Earlier parts are on Bemo already: the day is only partly covered.
+      const ids = committed.map((c) => `#${c.id}`).join(", ");
+      throw new Error(`Day only partly created (${ids} saved) — ${part.leaveType.name} part failed: ${err.message}. Fix in Bemo, do NOT recreate.`);
+    }
+  }
+
+  const ids = committed.map((c) => c.id);
+  const mismatches = committed.flatMap((c) => c.mismatches.map((m) => `#${c.id} ${m}`));
+  const result = {
+    date,
+    canonicalDate: request.canonicalDate,
+    id: ids[0],
+    ids,
+    start,
+    end,
+    reason,
+    leaveType: parts.map((p) => p.leaveType.name).join(" + "),
+  };
+  if (!mismatches.length) {
+    log.verified(ids.join(", #"));
+    return { status: "created", ...result, saved: committed.map((c) => c.saved) };
+  }
+  // The records exist on Bemo but differ from what was sent: never delete them automatically.
+  log.unverified(date, ids.join(", #"), mismatches);
+  return { status: "unverified", ...result, saved: committed.map((c) => c.saved), mismatches };
 }
 
 /**
@@ -269,10 +363,10 @@ async function createLateTimeOff(conn, arch, record, options = {}) {
       end,
       minutes: lateMinutes,
       reason: record.reason || BUSINESS.lateArrival.defaultReason,
-      checkSafety: async (saved) =>
+      checkSafety: async ({ parts, ...context }) =>
         checkLateRequest(
-          { date, start: saved.start, end: saved.end, lateMinutes },
-          { ...saved, attendance: await findAttendanceOnDay(conn, saved.employeeId, date) },
+          { date, start: parts[0].start, end: parts[0].end, lateMinutes },
+          { ...context, attendance: await findAttendanceOnDay(conn, context.employeeId, date) },
         ),
     },
     options,
@@ -298,11 +392,13 @@ async function createFullDayTimeOff(conn, arch, record, options = {}) {
       end: `${date} ${schedule.end}`,
       minutes: workMinutesPerDay(schedule),
       reason: record.reason || BUSINESS.fullDayLeave.defaultReason,
-      checkSafety: async (saved) =>
-        checkFullDayRequest(
-          { date, start: saved.start, end: saved.end, minutes: saved.minutes },
-          { ...saved, hasAttendance: (await findAttendanceOnDay(conn, saved.employeeId, date)).length > 0 },
-        ),
+      split: BUSINESS.fullDayLeave.splitAcrossLeaveTypes,
+      checkSafety: async ({ parts, ...context }) => {
+        const hasAttendance = (await findAttendanceOnDay(conn, context.employeeId, date)).length > 0;
+        return parts.length === 1
+          ? checkFullDayRequest({ date, ...parts[0] }, { ...context, hasAttendance })
+          : checkFullDaySplit(date, parts, { ...context, hasAttendance });
+      },
     },
     options,
   );
