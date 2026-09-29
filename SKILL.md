@@ -80,6 +80,11 @@ Dùng skill này khi user muốn thao tác với Bemo Cloud, bao gồm attendanc
   `bemo.prepare-timeoff` trước, rồi chỉ preview `bemo.create-timeoff`.
 - Không tạo time-off nếu chưa có plan JSON do `workflows/late-timeoff.js prepare` sinh
   ra và confirmation `bemo.create-timeoff` hợp lệ.
+- Nghỉ cả ngày qua Telegram: luôn gọi `bemo.fullday-preview` trước (JSON `{"dates": ["YYYY-MM-DD"], "reason"?}`,
+  chạy thử không lưu) và cho user xem loại phép/khung giờ (có thể bị tách thành nhiều loại phép), rồi mới
+  gọi `bemo.fullday-create` với đúng input đó sau confirmation.
+- Làm thêm giờ: `bemo.overtime-on` (`/bemo_overtime`) để cron 17:00 bỏ qua checkout hôm nay,
+  `bemo.overtime-off` (`/bemo_overtime_off`) để bật lại.
 - Không tạo hoặc verify time-off nếu user chỉ yêu cầu xem dữ liệu.
 - Khi lỗi login/session, ưu tiên báo cần refresh login thay vì tự suy đoán dữ liệu sai.
 - Không in credential, cookie hoặc token từ `.env`/browser profile.

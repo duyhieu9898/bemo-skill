@@ -2,9 +2,36 @@
 /**
  * Create full-day time off requests through the API engine.
  * Usage: node src/create-full-day.js DD/MM/YYYY [DD/MM/YYYY...] [--reason "..."] [--dry-run]
+ *        node src/create-full-day.js --stdin [--dry-run]   (JSON {"dates": ["YYYY-MM-DD"], "reason"?: "..."}, agent commands)
  */
 
 const { createTimeOffViaApi } = require("./rpc/create-leave");
+const { toIsoDate, isoToDisplay } = require("./utils");
+
+/**
+ * Parse the agent's structured input
+ * @param {string} text - JSON
+ * @returns {{dates: Array<string>, reason: string|undefined}} dates as DD/MM/YYYY
+ */
+function parseStdinInput(text) {
+  const input = JSON.parse(text);
+  if (!input || !Array.isArray(input.dates) || input.dates.length === 0) throw new Error("Input needs a non-empty dates array");
+  const dates = input.dates.map((value) => {
+    const iso = toIsoDate(value);
+    if (!iso || iso !== value) throw new Error(`Invalid date: ${value} (use YYYY-MM-DD)`);
+    return isoToDisplay(iso);
+  });
+  if (input.reason !== undefined && (typeof input.reason !== "string" || !input.reason.trim())) {
+    throw new Error("reason must be a non-empty string");
+  }
+  return { dates, reason: input.reason?.trim() };
+}
+
+async function readStdin() {
+  const chunks = [];
+  for await (const chunk of process.stdin) chunks.push(chunk);
+  return Buffer.concat(chunks).toString("utf8");
+}
 
 function parseArgs(argv) {
   const dates = [];
@@ -12,6 +39,7 @@ function parseArgs(argv) {
   let dryRun = false;
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--dry-run") dryRun = true;
+    else if (argv[i] === "--stdin") continue;
     else if (argv[i] === "--reason") reason = argv[++i];
     else dates.push(argv[i]);
   }
@@ -19,7 +47,9 @@ function parseArgs(argv) {
 }
 
 async function main() {
-  const { dates, reason, dryRun } = parseArgs(process.argv.slice(2));
+  const args = parseArgs(process.argv.slice(2));
+  const { dryRun } = args;
+  const { dates, reason } = process.argv.includes("--stdin") ? parseStdinInput(await readStdin()) : args;
   if (!dates.length) {
     console.log('Usage: node src/create-full-day.js DD/MM/YYYY [DD/MM/YYYY...] [--reason "..."] [--dry-run]');
     process.exit(1);
@@ -38,6 +68,8 @@ async function main() {
   }
   if (summary.failed.length || summary.unverified.length) process.exit(1);
 }
+
+module.exports = { parseStdinInput };
 
 if (require.main === module) {
   main().catch((err) => {
