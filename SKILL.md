@@ -72,7 +72,8 @@ Dùng skill này khi user muốn thao tác với Bemo Cloud, bao gồm attendanc
 
 ## Lưu Ý An Toàn
 
-- Checkout là thao tác thật trên Bemo.
+- Checkout là thao tác thật trên Bemo. Cron dùng `checkout:auto` (bỏ qua ngày đánh dấu bằng
+  `npm run overtime -- on`); `npm run checkout` thủ công luôn chạy.
 - Tạo time-off là thao tác ghi dữ liệu thật.
 - Qua Telegram, dùng `/bemo_late` để xem dữ liệu. Khi user muốn tạo time-off
   và bỏ qua một số ngày, agent phải dùng command có cấu trúc

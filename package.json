@@ -14,6 +14,8 @@
     "workflow:timeoff:prepare": "node src/workflows/late-timeoff.js prepare",
     "workflow:timeoff:create": "node src/workflows/late-timeoff.js create",
     "checkout": "node src/check-in-out.js --checkout-only",
+    "checkout:auto": "node src/check-in-out.js --checkout-only --respect-overtime",
+    "overtime": "node src/overtime.js",
     "run": "npm run data:sync && npm run off:create"
   },
   "dependencies": {

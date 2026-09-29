@@ -11,7 +11,7 @@ const runLog = path.join(logDir, "cron-run.log");
 
 const telegramBotToken = process.env.TELEGRAM_BOT_TOKEN;
 const telegramChatId = process.env.TELEGRAM_CHAT_ID;
-const jobCommand = process.env.JOB_COMMAND || "npm run checkout";
+const jobCommand = process.env.JOB_COMMAND || "npm run checkout:auto";
 
 if (process.argv.includes("--help")) {
   console.log(`Usage: node scripts/run-cron-telegram.js
@@ -22,7 +22,7 @@ Environment:
   TELEGRAM_CHAT_ID       Telegram chat id
   JOB_TIMEOUT_MS         Command timeout in milliseconds
 
-Default command: npm run checkout`);
+Default command: npm run checkout:auto (skips days marked with: npm run overtime -- on)`);
   process.exit(0);
 }
 

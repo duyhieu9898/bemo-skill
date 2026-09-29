@@ -94,6 +94,9 @@ Mã thoát khác 0 khi có đơn lỗi hoặc đơn **đã lưu nhưng sai** (in
 
 ### ⚙️ Lệnh bổ trợ khác
 - `npm run auth`: Đăng nhập lại nếu bị hết hạn session.
+- `npm run checkout`: Checkout ngay (thủ công, không bị chặn bởi đánh dấu làm thêm giờ).
+- `npm run overtime -- on [YYYY-MM-DD]` / `off` / `status`: Đánh dấu ngày làm thêm giờ. Cron 17:00 chạy
+  `npm run checkout:auto` và **bỏ qua** checkout ngày được đánh dấu; khi về, tự checkout bằng `npm run checkout`.
 
 ## 🔒 Cơ chế bảo vệ & Logic nghiệp vụ
 
