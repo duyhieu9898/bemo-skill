@@ -6,7 +6,7 @@
   "scripts": {
     "test": "node --test test/*.test.js",
     "auth": "node src/login.js",
-    "data:sync": "node src/get-attendance.js && node src/get-timeoff.js && node src/compare.js",
+    "data:sync": "node src/sync.js",
     "off:create": "node src/create-timeoff.js",
     "off:verify": "node src/verify-timeoff.js",
     "off:fullday": "node src/create-full-day.js",

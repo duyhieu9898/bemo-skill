@@ -15,11 +15,12 @@ const OUTPUT_FILE = CONFIG.dataFiles.attendance;
  * Fetch and save attendance records of the current (or previous) month
  * @param {Object} options - Options
  * @param {boolean} [options.previous=false] - Previous month instead of the current one
+ * @param {Object} [options.conn] - Existing connection (reused by sync)
  * @returns {Promise<Array>} Records
  */
-async function getAttendance({ previous = false } = {}) {
+async function getAttendance({ previous = false, conn = null } = {}) {
   const now = new Date();
-  const records = await fetchAttendance(await connect(), {
+  const records = await fetchAttendance(conn || (await connect()), {
     year: now.getFullYear(),
     monthIndex: now.getMonth() - (previous ? 1 : 0),
   });

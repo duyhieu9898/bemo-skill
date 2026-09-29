@@ -35,7 +35,7 @@ Dùng skill này khi user muốn thao tác với Bemo Cloud, bao gồm attendanc
 - Cần Chrome/Chromium khả dụng trên máy.
 - Cần session Bemo đã login; nếu hết session cần login lại.
 - Một số thao tác có tác động thật lên Bemo, đặc biệt checkout và tạo time-off.
-- Khi đồng bộ dữ liệu (`get-attendance.js` và `get-timeoff.js`), mặc định sẽ lấy dữ liệu của tháng hiện tại. Sử dụng tham số `--previous` nếu cần đồng bộ dữ liệu của tháng trước.
+- `npm run data:sync` (`src/sync.js`) đọc chấm công + time-off qua một kết nối rồi so sánh; mặc định tháng hiện tại, thêm `-- --previous` cho tháng trước.
 - Command được phép chạy do agent quản lý ở `agent/commands.json`, không nằm trong file này.
 
 ## File Liên Quan

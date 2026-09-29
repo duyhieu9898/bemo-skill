@@ -52,15 +52,17 @@ function filterByPreviousMonths(records) {
 /**
  * Fetch, filter and save time off records
  * @param {string|function} filterMode - "current" (current + previous month), "previous", or a filter function
+ * @param {Object} options - Options
+ * @param {Object} [options.conn] - Existing connection (reused by sync)
  * @returns {Promise<Array>} Processed records
  */
-async function getTimeOff(filterMode = "current") {
+async function getTimeOff(filterMode = "current", { conn = null } = {}) {
   const filterRecords =
     typeof filterMode === "function" ? filterMode : TIMEOFF_FILTERS[filterMode] || filterByCurrentMonths;
 
   // Previous + current month: the widest range either filter needs.
   const now = new Date();
-  const records = await fetchTimeOff(await connect(), {
+  const records = await fetchTimeOff(conn || (await connect()), {
     from: { year: now.getFullYear(), monthIndex: now.getMonth() - 1 },
     to: { year: now.getFullYear(), monthIndex: now.getMonth() + 1 },
   });

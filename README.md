@@ -53,7 +53,7 @@ npm run data:sync
 
 Nếu muốn đồng bộ dữ liệu của **tháng trước (Previous Month)**, bạn chạy lệnh:
 ```bash
-node src/get-attendance.js --previous && node src/get-timeoff.js --previous && node src/compare.js
+npm run data:sync -- --previous
 ```
 *Kết quả: Danh sách ngày cần tạo đơn sẽ nằm trong `data/action-needed.json`.*
 
