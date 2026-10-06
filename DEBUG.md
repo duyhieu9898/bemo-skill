@@ -23,7 +23,7 @@ Hệ thống lưu trữ log tại thư mục `logs/`:
 ### 1. Lỗi "Not logged in"
 *   **Dấu hiệu**: Xuất hiện ngay khi bắt đầu chạy các script lấy dữ liệu hoặc tạo đơn.
 *   **Nguyên nhân**: Session Bemo (cookie trong Chrome profile) đã hết hạn.
-*   **Cách sửa**: Chạy `npm run auth`.
+*   **Cách sửa**: Chạy `npm run login`.
 
 ### 2. Lỗi "Insufficient balance in ..."
 *   **Dấu hiệu**: Script bỏ qua (skip) một ngày cụ thể.
@@ -39,7 +39,7 @@ Hệ thống lưu trữ log tại thư mục `logs/`:
 
 ### 4. Lỗi "Safety rule violated"
 *   **Dấu hiệu**: Dừng trước khi lưu. Thông báo liệt kê từng luật bị vi phạm.
-*   **Cách sửa**: Thường do `action-needed.json` cũ: chạy lại `npm run data:sync`. Luật nằm ở `src/business-rules.js` và `src/timeoff/safety.js`.
+*   **Cách sửa**: Thường do `action-needed.json` cũ: chạy lại `npm run sync`. Luật nằm ở `src/timeoff/business-rules.js` và `src/timeoff/safety.js`.
 
 ### 5. "SAVED but differs from the request"
 *   **Dấu hiệu**: Đơn **đã được tạo** nhưng đọc lại thấy khác (in kèm `#id`).
@@ -53,8 +53,8 @@ Hệ thống lưu trữ log tại thư mục `logs/`:
 ## 🧪 Chạy thử không lưu
 
 ```bash
-npm run off:create -- --dry-run
-npm run off:fullday -- 18/09/2026 --dry-run
+npm run timeoff-late
+npm run leave -- 18/09/2026 --dry-run
 ```
 
 Chạy toàn bộ các bước (mở form, chọn loại phép, onchange, luật an toàn) và in giá trị sẽ gửi lên, nhưng không gọi `create`.

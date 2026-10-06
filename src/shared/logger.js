@@ -193,11 +193,11 @@ const createTimeOffLogger = {
 
   modeInfo: (count) => baseLog.raw(`${ICONS.create} Creating ${count} Time Off request(s)`),
 
-  nothingToCreate: () => baseLog.info("Nothing to create. Run: npm run data:sync"),
+  nothingToCreate: () => baseLog.info("Nothing to create. Run: npm run sync"),
   
   missingFile: (file) => {
     baseLog.error(`Missing data file: ${file}`);
-    baseLog.raw("👉 Please run: npm run data:sync");
+    baseLog.raw("👉 Please run: npm run sync");
   },
 
   verified: (id) => baseLog.indent(`${ICONS.success} Verified: time off #${id} saved as requested`),
@@ -218,7 +218,7 @@ const createTimeOffLogger = {
 const dataLogger = {
   saved: (count, filename) => baseLog.success(`Saved ${count} records to ${filename}`),
   notLoggedIn: () => {
-    throw bemoError("Not logged in to Bemo. Run: npm run auth", "BEMO_NOT_LOGGED_IN");
+    throw bemoError("Not logged in to Bemo. Run: npm run login", "BEMO_NOT_LOGGED_IN");
   },
 };
 

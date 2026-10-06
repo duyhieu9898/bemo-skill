@@ -1,90 +1,54 @@
 ---
-name: Bemo Automation
-description: Automate Bemo attendance checkout, late attendance data sync, time-off creation, and verification.
+name: bemo
+description: Bemo Cloud attendance and time off — checkout, sync attendance, late days, late-arrival time off, full-day leave, and the switch for scheduled automation. Use when the user mentions Bemo, chấm công, checkout, đi trễ, xin nghỉ, time-off.
 ---
 
-# Bemo Automation
+# Bemo
 
-## Khi Nào Dùng
+Node.js scripts in `{baseDir}`. Run with `npm run <script>` from `{baseDir}`.
 
-Dùng skill này khi user muốn thao tác với Bemo Cloud, bao gồm attendance, checkout, check-in/check-out, dữ liệu đi trễ, time-off request hoặc debug automation Bemo.
+## Scripts
 
-## Khả Năng
+Read-only:
 
-- Checkout attendance trên Bemo.
-- Đồng bộ dữ liệu attendance và time-off.
-- So sánh dữ liệu để tìm ngày đi trễ cần tạo time-off.
-- Tạo time-off request cho các record pending.
-- Verify time-off request đã tạo.
-- Debug log chạy Bemo automation.
+| Script | Does |
+|---|---|
+| `sync [-- --previous]` | Read attendance + time off for this (or last) month, compute late days needing time off |
+| `late-days` | List late days waiting for time off (from the last sync) |
+| `verify-timeoff` | Drop late days that already have time off on Bemo |
+| `auto -- status` | Whether scheduled automation is on |
 
-## Ngữ Cảnh Quan Trọng
+Writes to Bemo or changes behaviour:
 
-- Đây là project Node.js.
-- Đọc dữ liệu và tạo time-off qua Odoo JSON-RPC (`src/rpc/`), dùng lại session cookie
-  trong Chrome profile.
-- Checkout và login vẫn dùng browser (`puppeteer-core`) vì Bemo gửi GPS/payload mã hoá khi chấm công.
-- Tạo time-off qua API phát lại đúng dialog của UI (form view lấy từ calendar `form_view_id`, onchange
-  theo thứ tự mở form → loại phép → `date_to` → `date_from`), bỏ qua nếu đã có đơn active trùng khung giờ,
-  và đọc lại record theo id để xác minh. `npm run off:create -- --dry-run` điền + validate mà không tạo.
-- Đơn "SAVED but differs" đã nằm trên Bemo: báo user kiểm tra id đó, không tạo lại, không tự xoá.
-- Nghỉ cả ngày: `npm run off:fullday -- DD/MM/YYYY [--reason "..."] [--dry-run]` (08:00 → 17:00, server tính 8h).
-  Bị chặn nếu ngày đó có chấm công, không phải ngày làm việc, hoặc đã có đơn trùng giờ.
-- Business rules (lịch làm việc, ngưỡng đi trễ, thứ tự loại phép, giới hạn an toàn) chỉ nằm ở
-  `{baseDir}/src/business-rules.js`.
-- Cần Chrome/Chromium khả dụng trên máy.
-- Cần session Bemo đã login; nếu hết session cần login lại.
-- Một số thao tác có tác động thật lên Bemo, đặc biệt checkout và tạo time-off.
-- `npm run data:sync` (`src/sync.js`) đọc chấm công + time-off qua một kết nối rồi so sánh; mặc định tháng hiện tại, thêm `-- --previous` cho tháng trước.
-- Command được phép chạy do agent quản lý ở `agent/commands.json`, không nằm trong file này.
+| Script | Does |
+|---|---|
+| `checkout` | Check out now |
+| `timeoff-late` / `timeoff-late -- --apply` | Dry run (sync first) / create time off for every late day listed by the dry run |
+| `leave -- DD/MM/YYYY [...] [--reason "..."] [--dry-run]` | Full-day leave, 08:00–17:00 (may split across leave types) |
+| `auto -- on` / `auto -- off` | Turn scheduled automation on/off (stays until changed) |
+| `cron:install` / `cron:uninstall` | Add/remove the 17:00 weekday checkout cron line |
+| `login` | Open Chrome to log in again (needs a display; ask the user to run it) |
 
-## File Liên Quan
+Exit code 10 = skipped on purpose (auto off, or nothing to create).
 
-- Package scripts: `{baseDir}/package.json`
-- Bemo config: `{baseDir}/src/config.js`
-- Login/session script: `{baseDir}/src/login.js`
-- Check-in/out logic: `{baseDir}/src/check-in-out.js`
-- Attendance sync: `{baseDir}/src/get-attendance.js`
-- Time-off sync: `{baseDir}/src/get-timeoff.js`
-- Compare logic: `{baseDir}/src/compare.js`
-- Time-off creation: `{baseDir}/src/create-timeoff.js` (API engine: `{baseDir}/src/rpc/create-leave.js`)
-- Odoo JSON-RPC client, form emulation, sync: `{baseDir}/src/rpc/`
-- Time-off verification (dọn action-needed): `{baseDir}/src/verify-timeoff.js`
-- Luật an toàn, chọn loại phép, khoá: `{baseDir}/src/timeoff/`
-- Late-day time-off workflow wrapper: `{baseDir}/src/workflows/late-timeoff.js`
-- Cron Telegram runner: `{baseDir}/scripts/run-cron-telegram.js`
-- Cron setup: `{baseDir}/scripts/setup-cron.sh`
+## Rules
 
-## Data Và Log
+- Check out only when the user explicitly asks.
+- `timeoff-late` and `leave`: always run the dry run first, show the result, wait for the user's yes, then run `--apply` / without `--dry-run` — with the same dates and reason.
+- "SAVED but differs": the request is on Bemo; report its id, do not recreate, do not delete.
+- Session expired (`BEMO_NOT_LOGGED_IN`): tell the user to run `npm run login`; do not guess data.
+- Never print credentials, cookies or tokens from `.env` or the browser profile.
+- Never run or `require()` `scripts/run-cron-telegram.js` in tests or by hand: it performs the real checkout.
+- Any new scheduled job must call `readAuto()` (`src/timeoff/auto.js`) first and skip with exit 10 when off.
+- Business rules (schedule, late threshold, leave type order, safety limits) live only in `src/timeoff/business-rules.js`.
 
-- Pending records: `{baseDir}/data/action-needed.json`
-- Attendance data: `{baseDir}/data/attendance-data.json`
-- Time-off data: `{baseDir}/data/timeoff-data.json`
-- Human-readable log: `{baseDir}/logs/bemo.log`
-- Detailed create/debug log: `{baseDir}/logs/create-timeoff.json`
-- Cron runner log: `{baseDir}/logs/cron-run.log`
-- Cron service log: `{baseDir}/logs/cron.log`
+## Layout
 
-## Biến Môi Trường
+    src/commands/  one file per npm script (argv → library call → output)
+    src/odoo/      JSON-RPC client, form emulation, fetch, create-leave
+    src/browser/   puppeteer launch, login, checkout (Bemo signs GPS payloads, so checkout uses a browser)
+    src/timeoff/   business rules, compare, sync, create, verify, safety, lock, auto switch
+    src/shared/    config, logger, dates, files, errors, exit codes
 
-- `PUPPETEER_EXECUTABLE_PATH`: optional path tới Chrome/Chromium nếu auto-detect không hoạt động.
-- Bemo credential/session config nếu project yêu cầu trong `.env`.
-
-## Lưu Ý An Toàn
-
-- Checkout là thao tác thật trên Bemo. Cron dùng `checkout:auto` (bỏ qua ngày đánh dấu bằng
-  `npm run overtime -- on`); `npm run checkout` thủ công luôn chạy.
-- Tạo time-off là thao tác ghi dữ liệu thật.
-- Qua Telegram, dùng `/bemo_late` để xem dữ liệu. Khi user muốn tạo time-off
-  và bỏ qua một số ngày, agent phải dùng command có cấu trúc
-  `bemo.prepare-timeoff` trước, rồi chỉ preview `bemo.create-timeoff`.
-- Không tạo time-off nếu chưa có plan JSON do `workflows/late-timeoff.js prepare` sinh
-  ra và confirmation `bemo.create-timeoff` hợp lệ.
-- Nghỉ cả ngày qua Telegram: luôn gọi `bemo.fullday-preview` trước (JSON `{"dates": ["YYYY-MM-DD"], "reason"?}`,
-  chạy thử không lưu) và cho user xem loại phép/khung giờ (có thể bị tách thành nhiều loại phép), rồi mới
-  gọi `bemo.fullday-create` với đúng input đó sau confirmation.
-- Làm thêm giờ: `bemo.overtime-on` (`/bemo_overtime`) để cron 17:00 bỏ qua checkout hôm nay,
-  `bemo.overtime-off` (`/bemo_overtime_off`) để bật lại.
-- Không tạo hoặc verify time-off nếu user chỉ yêu cầu xem dữ liệu.
-- Khi lỗi login/session, ưu tiên báo cần refresh login thay vì tự suy đoán dữ liệu sai.
-- Không in credential, cookie hoặc token từ `.env`/browser profile.
+Data: `data/action-needed.json` (late days), `data/attendance-data.json`, `data/timeoff-data.json`, `data/auto.json`.
+Logs: `logs/bemo.log`, `logs/create-timeoff.json`, `logs/cron-run.log`, `logs/cron.log`.
