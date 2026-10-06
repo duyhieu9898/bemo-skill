@@ -29,6 +29,7 @@ Writes to Bemo or changes behaviour:
 | `cron:install` / `cron:uninstall` | Add/remove the 17:00 weekday checkout cron line |
 | `login` | Log in again (headless Chrome, credentials from `.env`) |
 
+Lines starting with "» " are the human summary (what Telegram shows); everything else is log.
 Exit code 10 = skipped on purpose (auto off, nothing to create, or checkout found Bemo not checked in / already checked out).
 
 ## Rules

@@ -8,7 +8,8 @@
 const CONFIG = require("../shared/config");
 const { loadJSON } = require("../shared");
 const { sync } = require("../timeoff/sync");
-const { createTimeOff, formatDryRun, summaryExitCode } = require("../timeoff/create");
+const { createTimeOff, formatDryRun, formatCreateResult, summaryExitCode } = require("../timeoff/create");
+const { say, fail } = require("../shared/report");
 const { savePreview, takePreview } = require("../timeoff/late-preview");
 
 const readActionData = () => loadJSON(CONFIG.dataFiles.actionNeeded);
@@ -20,12 +21,11 @@ async function main(argv) {
   const summary = await createTimeOff(null, { dryRun });
   if (dryRun) {
     savePreview(readActionData());
-    console.log(`\n${formatDryRun(summary)}`);
+    say(formatDryRun(summary));
+  } else {
+    say(formatCreateResult(summary));
   }
   process.exitCode = summaryExitCode(summary, { dryRun });
 }
 
-main(process.argv.slice(2)).catch((err) => {
-  console.error("❌", err.message);
-  process.exit(1);
-});
+main(process.argv.slice(2)).catch(fail);

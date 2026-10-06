@@ -5,17 +5,13 @@
  */
 
 const { readAuto, setAuto, describeAuto } = require("../timeoff/auto");
+const { say, fail } = require("../shared/report");
 
 const [command = "status"] = process.argv.slice(2);
 try {
-  if (command === "on" || command === "off") {
-    console.log(describeAuto(setAuto(command === "on")));
-  } else if (command === "status") {
-    console.log(describeAuto(readAuto()));
-  } else {
-    throw new Error("Usage: node src/commands/auto.js on | off | status");
-  }
+  if (command === "on" || command === "off") say(describeAuto(setAuto(command === "on")));
+  else if (command === "status") say(describeAuto(readAuto()));
+  else throw new Error("Usage: node src/commands/auto.js on | off | status");
 } catch (err) {
-  console.error("❌", err.message);
-  process.exit(1);
+  fail(err);
 }

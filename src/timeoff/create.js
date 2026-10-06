@@ -50,4 +50,18 @@ function summaryExitCode(summary, { dryRun }) {
   return dryRun && !summary.dryRun.length ? SKIPPED : 0;
 }
 
-module.exports = { createTimeOff, formatDryRun, summaryExitCode };
+/**
+ * Human summary of a real creation run
+ * @param {{created: Array<unknown>, skipped: Array<{date: string, reason?: string}>, failed: Array<{date: string, error: string}>, unverified: Array<{date: string, id?: number}>}} summary
+ * @returns {string}
+ */
+function formatCreateResult(summary) {
+  return [
+    `✅ Đã tạo ${summary.created.length} đơn`,
+    ...summary.skipped.map((s) => `⏭ ${s.date}: ${s.reason === "already exists" ? "đã có" : s.reason}`),
+    ...summary.failed.map((f) => `❌ ${f.date}: ${f.error}`),
+    ...summary.unverified.map((u) => `⚠️ ${u.date}: đã lưu nhưng khác yêu cầu (#${u.id}) — kiểm tra trên Bemo`),
+  ].join("\n");
+}
+
+module.exports = { createTimeOff, formatDryRun, summaryExitCode, formatCreateResult };

@@ -17,7 +17,7 @@ async function verifyAll() {
   const records = loadRecords(ACTION_FILE);
   if (records.length === 0) {
     console.log("No records in action-needed.json to verify.");
-    return;
+    return { verified: 0, missing: 0 };
   }
 
   console.log(`🔍 Verifying ${records.length} records against Bemo...`);
@@ -45,6 +45,16 @@ async function verifyAll() {
   }
   const missing = records.length - verifiedDates.length;
   if (missing > 0) console.log(`❌ ${missing} records still missing in Bemo.`);
+  return { verified: verifiedDates.length, missing };
 }
 
-module.exports = { verifyAll };
+/**
+ * @param {{verified: number, missing: number}} counts
+ * @returns {string}
+ */
+function formatVerify({ verified, missing }) {
+  if (!verified && !missing) return "🔎 Không có ngày nào cần kiểm tra";
+  return `🔎 ${verified} ngày đã có time-off, ${missing} ngày còn thiếu`;
+}
+
+module.exports = { verifyAll, formatVerify };

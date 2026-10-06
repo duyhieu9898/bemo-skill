@@ -5,7 +5,8 @@
  */
 
 const { createTimeOffViaApi } = require("../odoo/create-leave");
-const { formatDryRun, summaryExitCode } = require("../timeoff/create");
+const { formatDryRun, formatCreateResult, summaryExitCode } = require("../timeoff/create");
+const { say, fail } = require("../shared/report");
 
 function parseArgs(argv) {
   const dates = [];
@@ -22,17 +23,14 @@ function parseArgs(argv) {
 async function main() {
   const { dates, reason, dryRun } = parseArgs(process.argv.slice(2));
   if (!dates.length) {
-    console.log('Usage: node src/commands/leave.js DD/MM/YYYY [DD/MM/YYYY...] [--reason "..."] [--dry-run]');
+    say('Cách dùng: npm run leave -- DD/MM/YYYY [DD/MM/YYYY...] [--reason "..."] [--dry-run]');
     process.exit(1);
   }
   const records = dates.map((date) => ({ kind: "full-day", date, ...(reason ? { reason } : {}) }));
   // Full-day requests are not tracked in action-needed.json (that file is for late arrivals).
   const summary = await createTimeOffViaApi(records, { dryRun, updateActionFile: false });
-  if (dryRun) console.log(`\n${formatDryRun(summary)}`);
+  say(dryRun ? formatDryRun(summary) : formatCreateResult(summary));
   process.exitCode = summaryExitCode(summary, { dryRun });
 }
 
-main().catch((err) => {
-  console.error("❌", err.message);
-  process.exit(1);
-});
+main().catch(fail);

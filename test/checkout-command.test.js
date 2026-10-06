@@ -16,8 +16,11 @@ test("scheduled checkout is skipped with the auto description while off", () => 
   assert.match(reason, /^Tự động: TẮT từ 06\/10\/2026/);
 });
 
-test("a confirmed click is a successful checkout", () => {
-  assert.deepEqual(checkoutOutcome({ clicked: true, action: "Check out" }), { exitCode: 0, message: null });
+test("a confirmed click is a successful checkout with its time", () => {
+  assert.deepEqual(checkoutOutcome({ clicked: true, action: "Check out" }, new Date(2026, 9, 7, 17, 0, 3)), {
+    exitCode: 0,
+    message: "✅ Đã checkout lúc 17:00:03",
+  });
 });
 
 test("no click is reported as a skip with the button Bemo showed, never as success", () => {
