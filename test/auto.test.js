@@ -52,3 +52,27 @@ test("legacy overtime file without today migrates to on", () => {
   assert.deepEqual(readAuto({ ...f, today: "2026-10-06" }), { enabled: true, changedAt: "2026-10-06" });
   assert.equal(fs.existsSync(f.legacyFile), false);
 });
+
+test("an unreadable auto.json reads as off so a scheduled checkout skips", () => {
+  const f = files();
+  fs.writeFileSync(f.file, "{");
+  assert.deepEqual(readAuto({ ...f, today: "2026-10-06" }), { enabled: false, changedAt: null });
+  fs.writeFileSync(f.file, JSON.stringify({ enabled: "no" }));
+  assert.equal(readAuto({ ...f, today: "2026-10-06" }).enabled, false);
+});
+
+test("setAuto fails loudly when the state cannot be saved", () => {
+  const f = files();
+  fs.writeFileSync(f.legacyFile, "not a directory");
+  const file = path.join(f.legacyFile, "auto.json");
+  assert.throws(() => setAuto(false, { file, legacyFile: f.legacyFile + ".none", today: "2026-10-06" }), /Không lưu được/);
+});
+
+test("migration keeps the legacy file when saving fails", () => {
+  const f = files();
+  fs.writeFileSync(f.legacyFile, JSON.stringify({ dates: ["2026-10-06"] }));
+  const blocker = path.join(path.dirname(f.file), "blocker");
+  fs.writeFileSync(blocker, "");
+  assert.throws(() => readAuto({ file: path.join(blocker, "auto.json"), legacyFile: f.legacyFile, today: "2026-10-06" }), /Không lưu được/);
+  assert.equal(fs.existsSync(f.legacyFile), true);
+});

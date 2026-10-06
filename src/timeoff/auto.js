@@ -18,17 +18,30 @@ const LEGACY_FILE = path.join(DATA_DIR, "overtime.json");
  */
 
 /**
- * Current state; migrates the old per-day overtime.json once
+ * Save or throw: a lost OFF would mean a real checkout at 17:00
+ * @param {string} file
+ * @param {AutoState} state
+ */
+function save(file, state) {
+  if (!saveJSON(file, state)) throw new Error(`Không lưu được trạng thái tự động: ${file}`);
+}
+
+/**
+ * Current state; migrates the old per-day overtime.json once.
+ * Fails closed: an auto.json that exists but cannot be read counts as off.
  * @param {AutoOptions} [options]
  * @returns {AutoState}
  */
 function readAuto({ file = AUTO_FILE, legacyFile = LEGACY_FILE, today = systemToday() } = {}) {
-  const state = loadJSON(file);
-  if (state && typeof state.enabled === "boolean") return { enabled: state.enabled, changedAt: state.changedAt ?? null };
+  if (fs.existsSync(file)) {
+    const state = loadJSON(file);
+    if (state && typeof state.enabled === "boolean") return { enabled: state.enabled, changedAt: state.changedAt ?? null };
+    return { enabled: false, changedAt: null };
+  }
   if (fs.existsSync(legacyFile)) {
     const dates = loadJSON(legacyFile)?.dates || [];
     const migrated = { enabled: !dates.includes(today), changedAt: today };
-    saveJSON(file, migrated);
+    save(file, migrated);
     fs.rmSync(legacyFile);
     return migrated;
   }
@@ -46,7 +59,7 @@ function setAuto(enabled, options = {}) {
   const current = readAuto({ ...options, today });
   if (current.enabled === enabled && current.changedAt) return current;
   const next = { enabled, changedAt: today };
-  saveJSON(options.file || AUTO_FILE, next);
+  save(options.file || AUTO_FILE, next);
   return next;
 }
 
