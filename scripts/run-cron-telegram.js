@@ -35,10 +35,6 @@ function formatDate(date = new Date()) {
   });
 }
 
-function tailLines(text, maxLines) {
-  return text.trim().split(/\r?\n/).slice(-maxLines).join("\n") || "(không có output)";
-}
-
 /**
  * @param {{exitCode: number, signal?: string|null}} result
  * @returns {{ok: boolean, icon: string, title: string}}
@@ -50,7 +46,32 @@ function describeResult({ exitCode, signal }) {
   return { ok: false, icon: "❌", title: "Bemo checkout thất bại" };
 }
 
-async function sendTelegram(text) {
+const MARK = "» ";
+
+/**
+ * Telegram text + inline buttons for one cron run: summary lines first, log only when it failed
+ * @param {{exitCode: number, signal?: string|null, output: string}} result
+ * @param {string} finishedAt
+ * @returns {{text: string, buttons: Array<{text: string, callback_data: string}>}}
+ */
+function cronMessage(result, finishedAt) {
+  const { ok, icon, title } = describeResult(result);
+  const lines = result.output.trim().split(/\r?\n/).filter(Boolean);
+  const summary = lines.filter((l) => l.startsWith(MARK)).map((l) => l.slice(MARK.length));
+  const log = lines.filter((l) => !l.startsWith(MARK));
+  const exitLine = ok ? "" : `\n🔢 Exit code: ${result.exitCode || result.signal}`;
+  let body;
+  if (!summary.length) body = `📋 ${ok ? "Kết quả" : "Lỗi gần nhất"}:\n${log.slice(-16).join("\n") || "(không có output)"}`;
+  else body = summary.join("\n") + (ok ? "" : `\n\n📋 Log:\n${log.slice(-10).join("\n")}`);
+  const buttons = [];
+  if (result.exitCode === SKIPPED && summary.some((l) => l.includes("Tự động: TẮT"))) {
+    buttons.push({ text: "⚙️ Bật lại tự động", callback_data: "cmd:bemo_auto_on" });
+  }
+  buttons.push({ text: "📋 Menu", callback_data: "menu" });
+  return { text: `${icon} ${title}\n🕒 ${finishedAt}${exitLine}\n\n${body}`, buttons };
+}
+
+async function sendTelegram(text, buttons = []) {
   const response = await fetch(`https://api.telegram.org/bot${telegramBotToken}/sendMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -58,6 +79,7 @@ async function sendTelegram(text) {
       chat_id: telegramChatId,
       text,
       disable_web_page_preview: true,
+      ...(buttons.length ? { reply_markup: { inline_keyboard: [buttons] } } : {}),
     }),
   });
 
@@ -101,17 +123,9 @@ async function main() {
   fs.appendFileSync(runLog, result.output);
 
   const finishedAt = formatDate();
-  const { ok, icon, title } = describeResult(result);
-  const outputTitle = ok ? "📋 Kết quả:" : "📋 Lỗi gần nhất:";
-  const exitLine = ok ? "" : `\n🔢 Exit code: ${result.exitCode || result.signal}`;
-
-  const message = `${icon} ${title}
-🕒 ${finishedAt}${exitLine}
-
-${outputTitle}
-${tailLines(result.output, ok ? 12 : 16)}`;
-
-  await sendTelegram(message);
+  const { ok } = describeResult(result);
+  const { text, buttons } = cronMessage(result, finishedAt);
+  await sendTelegram(text, buttons);
 
   if (!ok) {
     process.exit(result.exitCode || 1);
@@ -136,4 +150,4 @@ ${error.message}`;
   });
 }
 
-module.exports = { describeResult };
+module.exports = { describeResult, cronMessage };
