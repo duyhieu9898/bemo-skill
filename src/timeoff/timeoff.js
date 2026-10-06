@@ -1,7 +1,5 @@
-#!/usr/bin/env node
 /**
  * Get Time Off - Fetch time off records from Bemo (JSON-RPC)
- * Usage: node src/get-timeoff.js [--previous]
  */
 
 const CONFIG = require("../shared/config");
@@ -73,13 +71,6 @@ async function getTimeOff(filterMode = "current", { conn = null } = {}) {
   dataLogger.saved(filtered.length, "data/timeoff-data.json");
 
   return filtered;
-}
-
-if (require.main === module) {
-  getTimeOff(process.argv.includes("--previous") ? "previous" : "current").catch((err) => {
-    console.error("❌", err.message);
-    process.exit(1);
-  });
 }
 
 module.exports = {

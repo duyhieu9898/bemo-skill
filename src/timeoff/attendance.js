@@ -1,7 +1,5 @@
-#!/usr/bin/env node
 /**
  * Get Attendance - Fetch attendance records from Bemo (JSON-RPC)
- * Usage: node src/get-attendance.js [--previous]
  */
 
 const CONFIG = require("../shared/config");
@@ -29,13 +27,6 @@ async function getAttendance({ previous = false, conn = null } = {}) {
   dataLogger.saved(records.length, "data/attendance-data.json");
 
   return records;
-}
-
-if (require.main === module) {
-  getAttendance({ previous: process.argv.includes("--previous") }).catch((err) => {
-    console.error("❌", err.message);
-    process.exit(1);
-  });
 }
 
 module.exports = { getAttendance };

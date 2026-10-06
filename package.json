@@ -5,19 +5,16 @@
   "scripts": {
     "test": "node --test test/*.test.js",
     "typecheck": "tsc -p jsconfig.json",
-    "auth": "node src/browser/login.js",
-    "data:sync": "node src/timeoff/sync.js",
-    "off:create": "node src/timeoff/create.js",
-    "off:verify": "node src/timeoff/verify.js",
-    "off:fullday": "node src/commands/leave.js",
-    "workflow:late:list": "node src/workflows/late-timeoff.js list",
-    "workflow:timeoff:prepare": "node src/workflows/late-timeoff.js prepare",
-    "workflow:timeoff:create": "node src/workflows/late-timeoff.js create",
+    "login": "node src/commands/login.js",
     "checkout": "node src/commands/checkout.js",
     "checkout:scheduled": "node src/commands/checkout.js --scheduled",
     "checkout:auto": "node src/commands/checkout.js --scheduled",
-    "auto": "node src/commands/auto.js",
-    "run": "npm run data:sync && npm run off:create"
+    "sync": "node src/commands/sync.js",
+    "late-days": "node src/commands/late-days.js",
+    "verify-timeoff": "node src/commands/verify-timeoff.js",
+    "leave": "node src/commands/leave.js",
+    "timeoff-late": "node src/commands/timeoff-late.js",
+    "auto": "node src/commands/auto.js"
   },
   "dependencies": {
     "dotenv": "^17.3.1",

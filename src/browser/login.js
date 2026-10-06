@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * Login - Open browser for manual login
  */
@@ -84,11 +83,6 @@ async function login() {
     await closeBrowser(browser);
     process.exit(1);
   }
-}
-
-// CLI entry point
-if (require.main === module) {
-  login();
 }
 
 module.exports = { login };

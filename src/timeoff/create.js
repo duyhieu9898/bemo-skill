@@ -1,11 +1,10 @@
-#!/usr/bin/env node
 /**
  * Create late-arrival time off for the records in action-needed.json (API engine).
- * Usage: node src/create-timeoff.js [--dry-run]
  */
 
 const CONFIG = require("../shared/config");
 const { loadJSON, createTimeOffLogger: log } = require("../shared");
+const { SKIPPED } = require("../shared/exit-codes");
 const { createTimeOffViaApi } = require("../odoo/create-leave");
 
 const ACTION_FILE = CONFIG.dataFiles.actionNeeded;
@@ -28,15 +27,27 @@ async function createTimeOff(selectedRecords = null, { dryRun = false } = {}) {
   return createTimeOffViaApi(selectedRecords, { dryRun });
 }
 
-if (require.main === module) {
-  createTimeOff(null, { dryRun: process.argv.includes("--dry-run") })
-    .then((summary) => {
-      if (summary.failed.length || summary.unverified.length) process.exit(1);
-    })
-    .catch((err) => {
-      console.error("❌", err.message);
-      process.exit(1);
-    });
+/**
+ * Human summary of a dry run
+ * @param {{dryRun: Array<{date: string, parts: Array<{leaveType: string, minutes: number}>}>}} summary
+ * @returns {string}
+ */
+function formatDryRun(summary) {
+  const lines = summary.dryRun.flatMap((item) =>
+    item.parts.map((part) => `🧪 ${item.date}: ${part.leaveType} — ${part.minutes} phút`),
+  );
+  return lines.length ? lines.join("\n") : "Không có đơn nào để tạo.";
 }
 
-module.exports = { createTimeOff };
+/**
+ * Exit code for a creation run: 1 on any failure, 10 when a dry run has nothing to create, else 0
+ * @param {{failed: Array<unknown>, unverified: Array<unknown>, dryRun: Array<unknown>}} summary
+ * @param {{dryRun: boolean}} options
+ * @returns {number}
+ */
+function summaryExitCode(summary, { dryRun }) {
+  if (summary.failed.length || summary.unverified.length) return 1;
+  return dryRun && !summary.dryRun.length ? SKIPPED : 0;
+}
+
+module.exports = { createTimeOff, formatDryRun, summaryExitCode };

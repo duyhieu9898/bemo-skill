@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * Compare Attendance vs Time Off - Find missing time off requests
  */
@@ -185,18 +184,6 @@ function compare(options = {}) {
   }
 
   return categories;
-}
-
-// CLI entry point
-if (require.main === module) {
-  const skipCheck = process.argv.includes("--skip-check");
-
-  try {
-    compare({ skipTimestampCheck: skipCheck });
-  } catch (err) {
-    console.error("❌", err.message);
-    process.exit(1);
-  }
 }
 
 module.exports = { compare, needsTimeOff };

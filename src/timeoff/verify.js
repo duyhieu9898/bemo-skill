@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * Verify Time Off - remove records from action-needed.json that already have an active time off
  * covering workSchedule.start -> check-in time (JSON-RPC).
@@ -46,13 +45,6 @@ async function verifyAll() {
   }
   const missing = records.length - verifiedDates.length;
   if (missing > 0) console.log(`❌ ${missing} records still missing in Bemo.`);
-}
-
-if (require.main === module) {
-  verifyAll().catch((err) => {
-    console.error("❌", err.message);
-    process.exit(1);
-  });
 }
 
 module.exports = { verifyAll };
