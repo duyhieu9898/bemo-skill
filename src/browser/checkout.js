@@ -6,7 +6,7 @@
 const CONFIG = require("../shared/config");
 const { withBrowser, navigateWithAuth } = require("./launch");
 const { login } = require("./login");
-const { isOvertime } = require("../timeoff/overtime");
+const { readAuto, describeAuto } = require("../timeoff/auto");
 
 const ATTENDANCE_RPC = "/web/dataset/call_kw/hr.employee/attendance_manual";
 // Bemo reads geolocation before sending the RPC, so allow more than a plain request.
@@ -22,9 +22,12 @@ const ATTENDANCE_RPC_TIMEOUT = 30000;
 async function checkInOut(headless = true, options = {}) {
   console.log(`🚀 Starting Check In/Out process...`);
 
-  if (options.respectOvertime && isOvertime()) {
-    console.log("🕔 Today is marked as overtime: automatic checkout skipped. Run `npm run checkout` when you leave.");
-    return;
+  if (options.respectOvertime) {
+    const auto = readAuto();
+    if (!auto.enabled) {
+      console.log(describeAuto(auto));
+      return;
+    }
   }
 
   try {
