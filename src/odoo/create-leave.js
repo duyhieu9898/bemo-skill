@@ -3,9 +3,9 @@
  * open form -> pick leave type -> set end -> set start -> description -> create -> read back.
  */
 
-const CONFIG = require("../config");
-const BUSINESS = require("../business-rules");
-const { extractTimeFromDateTime, createTimeOffLogger: log, debugLog: _debugLog } = require("../utils");
+const CONFIG = require("../shared/config");
+const BUSINESS = require("../timeoff/business-rules");
+const { extractTimeFromDateTime, createTimeOffLogger: log, debugLog: _debugLog } = require("../shared");
 const { findSuitableLeaveType, planLeaveSplit, toWallClockRanges } = require("../timeoff/logic");
 const { removeFromActionFile } = require("../timeoff/action-file");
 const { withCreateLock } = require("../timeoff/lock");

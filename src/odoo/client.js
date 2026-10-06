@@ -3,8 +3,9 @@
  * Reuses the session cookie stored in the Puppeteer profile, then talks to Odoo without a browser.
  */
 
-const CONFIG = require("../config");
-const { withBrowser, bemoError } = require("../utils");
+const CONFIG = require("../shared/config");
+const { bemoError } = require("../shared");
+const { withBrowser } = require("../browser/launch");
 
 const BASE_URL = new URL(CONFIG.urls.login).origin;
 

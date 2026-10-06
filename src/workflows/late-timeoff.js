@@ -2,10 +2,10 @@
 
 const crypto = require("node:crypto");
 
-const CONFIG = require("../config");
-const BUSINESS = require("../business-rules");
-const { createTimeOff } = require("../create-timeoff");
-const { loadJSON, toIsoDate } = require("../utils");
+const CONFIG = require("../shared/config");
+const BUSINESS = require("../timeoff/business-rules");
+const { createTimeOff } = require("../timeoff/create");
+const { loadJSON, toIsoDate } = require("../shared");
 
 const PLAN_VERSION = 1;
 const ACTION_FILE = CONFIG.dataFiles.actionNeeded;

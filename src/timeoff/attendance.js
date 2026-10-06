@@ -4,10 +4,10 @@
  * Usage: node src/get-attendance.js [--previous]
  */
 
-const CONFIG = require("./config");
-const { saveJSON, createDataWrapper, dataLogger } = require("./utils");
-const { connect } = require("./rpc/client");
-const { fetchAttendance } = require("./rpc/sync");
+const CONFIG = require("../shared/config");
+const { saveJSON, createDataWrapper, dataLogger } = require("../shared");
+const { connect } = require("../odoo/client");
+const { fetchAttendance } = require("../odoo/fetch");
 
 const OUTPUT_FILE = CONFIG.dataFiles.attendance;
 

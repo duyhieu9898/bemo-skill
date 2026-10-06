@@ -4,11 +4,11 @@
  * Usage: node src/get-timeoff.js [--previous]
  */
 
-const CONFIG = require("./config");
+const CONFIG = require("../shared/config");
 const BUSINESS = require("./business-rules");
-const { saveJSON, createDataWrapper, getFilterMonths, isInFilterMonths, dataLogger } = require("./utils");
-const { connect } = require("./rpc/client");
-const { fetchTimeOff } = require("./rpc/sync");
+const { saveJSON, createDataWrapper, getFilterMonths, isInFilterMonths, dataLogger } = require("../shared");
+const { connect } = require("../odoo/client");
+const { fetchTimeOff } = require("../odoo/fetch");
 
 const OUTPUT_FILE = CONFIG.dataFiles.timeoff;
 const TIMEOFF_FILTERS = {

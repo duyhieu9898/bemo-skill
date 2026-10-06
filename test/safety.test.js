@@ -47,7 +47,7 @@ test("run checks catch duplicates and oversized batches", () => {
 });
 
 test("late time off must end by lunch", () => {
-  const BUSINESS = require("../src/business-rules");
+  const BUSINESS = require("../src/timeoff/business-rules");
   const request = { date: "25/09/2026", start: "25/09/2026 08:00", end: "25/09/2026 08:37", lateMinutes: 37 };
   const original = BUSINESS.workSchedule.lunchStart;
   try {

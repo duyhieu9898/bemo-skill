@@ -5,9 +5,9 @@
  * Usage: node src/sync.js [--previous]
  */
 
-const { connect } = require("./rpc/client");
-const { getAttendance } = require("./get-attendance");
-const { getTimeOff } = require("./get-timeoff");
+const { connect } = require("../odoo/client");
+const { getAttendance } = require("./attendance");
+const { getTimeOff } = require("./timeoff");
 const { compare } = require("./compare");
 
 async function sync({ previous = false } = {}) {

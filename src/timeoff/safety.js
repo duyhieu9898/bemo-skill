@@ -3,9 +3,9 @@
  * Pure functions: every engine calls them right before saving and refuses on any violation.
  */
 
-const BUSINESS = require("../business-rules");
-const { bemoError } = require("../utils/errors");
-const { toIsoDate, parseLocalDateTime, toMinutes, systemToday, previousMonthStart } = require("../utils/date");
+const BUSINESS = require("./business-rules");
+const { bemoError } = require("../shared/errors");
+const { toIsoDate, parseLocalDateTime, toMinutes, systemToday, previousMonthStart } = require("../shared/date");
 
 /**
  * Working minutes in one day according to the schedule (lunch excluded)

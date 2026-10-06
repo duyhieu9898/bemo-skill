@@ -5,8 +5,8 @@
  *        node src/create-full-day.js --stdin [--dry-run]   (JSON {"dates": ["YYYY-MM-DD"], "reason"?: "..."}, agent commands)
  */
 
-const { createTimeOffViaApi } = require("./rpc/create-leave");
-const { toIsoDate, isoToDisplay } = require("./utils");
+const { createTimeOffViaApi } = require("../odoo/create-leave");
+const { toIsoDate, isoToDisplay } = require("../shared");
 
 /**
  * Parse the agent's structured input

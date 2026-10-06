@@ -4,9 +4,9 @@
 const path = require("path");
 const os = require("os");
 const fs = require("fs");
-require("dotenv").config({ path: path.join(__dirname, "..", ".env"), quiet: true });
+require("dotenv").config({ path: path.join(__dirname, "..", "..", ".env"), quiet: true });
 
-const DATA_DIR = path.join(__dirname, "..", "data");
+const DATA_DIR = path.join(__dirname, "..", "..", "data");
 const DEFAULT_BASE_URL = "https://bap.bemo-cloud.com";
 
 function getBaseUrl() {

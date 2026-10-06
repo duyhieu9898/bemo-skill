@@ -1,9 +1,8 @@
 /**
- * Utils - Re-export all utilities
+ * Shared utilities - date, file, logger, errors
  */
 
 module.exports = {
-  ...require("./browser"),
   ...require("./date"),
   ...require("./file"),
   ...require("./logger"),

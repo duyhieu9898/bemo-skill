@@ -3,10 +3,10 @@
  * Check In/Out - Automated Bemo Attendance
  */
 
-const CONFIG = require("./config");
-const { withBrowser, navigateWithAuth } = require("./utils");
+const CONFIG = require("../shared/config");
+const { withBrowser, navigateWithAuth } = require("./launch");
 const { login } = require("./login");
-const { isOvertime } = require("./overtime");
+const { isOvertime } = require("../timeoff/overtime");
 
 const ATTENDANCE_RPC = "/web/dataset/call_kw/hr.employee/attendance_manual";
 // Bemo reads geolocation before sending the RPC, so allow more than a plain request.

@@ -3,9 +3,10 @@
  * Login - Open browser for manual login
  */
 
-const CONFIG = require("./config");
-const { createBrowser, closeBrowser, sleep, loginLogger: log, baseLog } = require("./utils");
-require("dotenv").config({ path: require("path").join(__dirname, "..", ".env"), quiet: true });
+const CONFIG = require("../shared/config");
+const { loginLogger: log, baseLog } = require("../shared");
+const { createBrowser, closeBrowser, sleep } = require("./launch");
+require("dotenv").config({ path: require("path").join(__dirname, "..", "..", ".env"), quiet: true });
 
 const TIMEOUT = {
   navigation: 30000,

@@ -2,8 +2,8 @@
  * action-needed.json bookkeeping shared by the browser and API engines
  */
 
-const CONFIG = require("../config");
-const { loadRecords, saveJSON, createDataWrapper, createTimeOffLogger: log } = require("../utils");
+const CONFIG = require("../shared/config");
+const { loadRecords, saveJSON, createDataWrapper, createTimeOffLogger: log } = require("../shared");
 
 const ACTION_FILE = CONFIG.dataFiles.actionNeeded;
 

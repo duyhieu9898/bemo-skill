@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 
-const { parseFormFields, buildOnchangeSpec, evalModifier, buildCreateValues, missingRequiredFields } = require("../src/rpc/form");
+const { parseFormFields, buildOnchangeSpec, evalModifier, buildCreateValues, missingRequiredFields } = require("../src/odoo/form");
 
 const arch = fs.readFileSync(path.join(__dirname, "fixtures", "hr-leave-dialog-form.xml"), "utf8");
 const fields = parseFormFields(arch);

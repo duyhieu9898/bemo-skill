@@ -3,9 +3,9 @@
  * Compare Attendance vs Time Off - Find missing time off requests
  */
 
-const CONFIG = require("./config");
+const CONFIG = require("../shared/config");
 const BUSINESS = require("./business-rules");
-const { loadJSON, saveJSON, createDataWrapper, extractDateFromDateTime, compareLogger: log } = require("./utils");
+const { loadJSON, saveJSON, createDataWrapper, extractDateFromDateTime, compareLogger: log } = require("../shared");
 
 const { attendance, timeoff, actionNeeded } = CONFIG.dataFiles;
 const {

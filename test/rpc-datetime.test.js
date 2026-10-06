@@ -6,7 +6,7 @@ const {
   localDisplayToOdoo,
   localMonthStartToOdoo,
   localToday,
-} = require("../src/rpc/datetime");
+} = require("../src/odoo/datetime");
 
 const TZ = "Asia/Saigon";
 

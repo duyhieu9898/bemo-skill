@@ -9,7 +9,7 @@ const {
   getFilterMonths,
   isInFilterMonths,
   addMonths,
-} = require("../src/utils/date");
+} = require("../src/shared/date");
 
 test("toIsoDate accepts Bemo and ISO dates and rejects impossible ones", () => {
   assert.equal(toIsoDate("18/09/2026"), "2026-09-18");

@@ -3,7 +3,7 @@
  */
 
 const puppeteer = require("puppeteer-core");
-const { dataLogger: logger } = require("./logger");
+const { dataLogger: logger } = require("../shared/logger");
 
 /**
  * Create a new browser instance

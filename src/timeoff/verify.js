@@ -4,13 +4,13 @@
  * covering workSchedule.start -> check-in time (JSON-RPC).
  */
 
-const CONFIG = require("./config");
+const CONFIG = require("../shared/config");
 const BUSINESS = require("./business-rules");
-const { loadRecords, extractTimeFromDateTime } = require("./utils");
-const { connect } = require("./rpc/client");
-const { localDisplayToOdoo } = require("./rpc/datetime");
-const { findActiveLeavesOnDay } = require("./rpc/create-leave");
-const { removeFromActionFile } = require("./timeoff/action-file");
+const { loadRecords, extractTimeFromDateTime } = require("../shared");
+const { connect } = require("../odoo/client");
+const { localDisplayToOdoo } = require("../odoo/datetime");
+const { findActiveLeavesOnDay } = require("../odoo/create-leave");
+const { removeFromActionFile } = require("./action-file");
 
 const ACTION_FILE = CONFIG.dataFiles.actionNeeded;
 

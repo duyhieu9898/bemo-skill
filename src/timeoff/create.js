@@ -4,9 +4,9 @@
  * Usage: node src/create-timeoff.js [--dry-run]
  */
 
-const CONFIG = require("./config");
-const { loadJSON, createTimeOffLogger: log } = require("./utils");
-const { createTimeOffViaApi } = require("./rpc/create-leave");
+const CONFIG = require("../shared/config");
+const { loadJSON, createTimeOffLogger: log } = require("../shared");
+const { createTimeOffViaApi } = require("../odoo/create-leave");
 
 const ACTION_FILE = CONFIG.dataFiles.actionNeeded;
 

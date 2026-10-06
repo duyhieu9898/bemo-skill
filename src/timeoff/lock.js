@@ -5,8 +5,8 @@
 
 const fs = require("fs");
 const path = require("path");
-const CONFIG = require("../config");
-const { bemoError } = require("../utils/errors");
+const CONFIG = require("../shared/config");
+const { bemoError } = require("../shared/errors");
 
 const DEFAULT_LOCK_FILE = path.join(path.dirname(CONFIG.dataFiles.actionNeeded), ".create-timeoff.lock");
 

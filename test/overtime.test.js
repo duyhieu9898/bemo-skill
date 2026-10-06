@@ -4,8 +4,8 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 
-const { isOvertime, setOvertime } = require("../src/overtime");
-const { systemToday } = require("../src/utils/date");
+const { isOvertime, setOvertime } = require("../src/timeoff/overtime");
+const { systemToday } = require("../src/shared/date");
 
 const tmpFile = () => path.join(fs.mkdtempSync(path.join(os.tmpdir(), "bemo-ot-")), "overtime.json");
 

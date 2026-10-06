@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 
-const { createLateTimeOff, createFullDayTimeOff } = require("../src/rpc/create-leave");
+const { createLateTimeOff, createFullDayTimeOff } = require("../src/odoo/create-leave");
 
 const arch = fs.readFileSync(path.join(__dirname, "fixtures", "hr-leave-dialog-form.xml"), "utf8");
 const TODAY = "2026-09-30";

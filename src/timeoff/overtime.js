@@ -6,8 +6,8 @@
  */
 
 const path = require("path");
-const CONFIG = require("./config");
-const { loadJSON, saveJSON, systemToday, toIsoDate } = require("./utils");
+const CONFIG = require("../shared/config");
+const { loadJSON, saveJSON, systemToday, toIsoDate } = require("../shared");
 
 const OVERTIME_FILE = path.join(path.dirname(CONFIG.dataFiles.actionNeeded), "overtime.json");
 

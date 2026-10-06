@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const { parseStdinInput } = require("../src/create-full-day");
+const { parseStdinInput } = require("../src/commands/leave");
 
 test("agent input: ISO dates become Bemo dates, reason is optional", () => {
   assert.deepEqual(parseStdinInput('{"dates":["2026-09-18"]}'), { dates: ["18/09/2026"], reason: undefined });
