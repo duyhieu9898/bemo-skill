@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * Check In/Out - Automated Bemo Attendance
  */
@@ -6,7 +5,6 @@
 const CONFIG = require("../shared/config");
 const { withBrowser, navigateWithAuth } = require("./launch");
 const { login } = require("./login");
-const { readAuto, describeAuto } = require("../timeoff/auto");
 
 const ATTENDANCE_RPC = "/web/dataset/call_kw/hr.employee/attendance_manual";
 // Bemo reads geolocation before sending the RPC, so allow more than a plain request.
@@ -17,18 +15,9 @@ const ATTENDANCE_RPC_TIMEOUT = 30000;
  * @param {boolean} headless - Run in headless mode
  * @param {object} options - Runtime options
  * @param {boolean} [options.checkoutOnly] - Only click when the current action is Check out
- * @param {boolean} [options.respectOvertime] - Skip when today is marked as overtime (automatic runs)
  */
 async function checkInOut(headless = true, options = {}) {
   console.log(`🚀 Starting Check In/Out process...`);
-
-  if (options.respectOvertime) {
-    const auto = readAuto();
-    if (!auto.enabled) {
-      console.log(describeAuto(auto));
-      return;
-    }
-  }
 
   try {
     await runCheckInOut(headless, options);
@@ -99,30 +88,6 @@ async function runCheckInOut(headless, { checkoutOnly = false }) {
 function isCheckoutAction(status) {
   const text = `${status.label || ""} ${status.title || ""}`.toLowerCase();
   return text.includes("check out") || text.includes("checkout");
-}
-
-// CLI entry point
-if (require.main === module) {
-  if (process.argv.includes("--help")) {
-    console.log(`Usage: node src/check-in-out.js [--checkout-only] [--respect-overtime] [--show]
-
-Options:
-  --checkout-only     Only click when the current action is Check out
-  --respect-overtime  Skip when today is marked with: npm run overtime -- on
-  --show              Run with a visible browser
-  --help           Show this help message`);
-    process.exit(0);
-  }
-
-  const show = process.argv.includes("--show");
-  const checkoutOnly = process.argv.includes("--checkout-only");
-  const respectOvertime = process.argv.includes("--respect-overtime");
-  const headless = !show;
-
-  checkInOut(headless, { checkoutOnly, respectOvertime }).catch((err) => {
-    console.error("❌ Error:", err.message);
-    process.exit(1);
-  });
 }
 
 module.exports = { checkInOut, isCheckoutAction };

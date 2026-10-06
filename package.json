@@ -13,8 +13,9 @@
     "workflow:late:list": "node src/workflows/late-timeoff.js list",
     "workflow:timeoff:prepare": "node src/workflows/late-timeoff.js prepare",
     "workflow:timeoff:create": "node src/workflows/late-timeoff.js create",
-    "checkout": "node src/browser/checkout.js --checkout-only",
-    "checkout:auto": "node src/browser/checkout.js --checkout-only --respect-overtime",
+    "checkout": "node src/commands/checkout.js",
+    "checkout:scheduled": "node src/commands/checkout.js --scheduled",
+    "checkout:auto": "node src/commands/checkout.js --scheduled",
     "auto": "node src/commands/auto.js",
     "run": "npm run data:sync && npm run off:create"
   },
