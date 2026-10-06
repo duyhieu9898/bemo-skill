@@ -29,7 +29,7 @@ Writes to Bemo or changes behaviour:
 | `cron:install` / `cron:uninstall` | Add/remove the 17:00 weekday checkout cron line |
 | `login` | Open Chrome to log in again (needs a display; ask the user to run it) |
 
-Exit code 10 = skipped on purpose (auto off, or nothing to create).
+Exit code 10 = skipped on purpose (auto off, nothing to create, or checkout found Bemo not checked in / already checked out).
 
 ## Rules
 

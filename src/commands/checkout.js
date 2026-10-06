@@ -22,6 +22,19 @@ function scheduledSkipReason(scheduled, read = readAuto) {
   return auto.enabled ? null : describeAuto(auto);
 }
 
+/**
+ * Exit code and message for a checkout run: a run without a click is a skip, not a success
+ * @param {{clicked: boolean, action: string}} result
+ * @returns {{exitCode: number, message: string|null}}
+ */
+function checkoutOutcome({ clicked, action }) {
+  if (clicked) return { exitCode: 0, message: null };
+  return {
+    exitCode: SKIPPED,
+    message: `⏸️ Không checkout: Bemo đang hiện nút "${action}" (chưa check-in hôm nay, hoặc đã checkout rồi).`,
+  };
+}
+
 async function main(argv) {
   const skip = scheduledSkipReason(argv.includes("--scheduled"));
   if (skip) {
@@ -29,10 +42,12 @@ async function main(argv) {
     process.exitCode = SKIPPED;
     return;
   }
-  await checkInOut(!argv.includes("--show"), { checkoutOnly: true });
+  const { exitCode, message } = checkoutOutcome(await checkInOut(!argv.includes("--show"), { checkoutOnly: true }));
+  if (message) console.log(message);
+  process.exitCode = exitCode;
 }
 
-module.exports = { scheduledSkipReason };
+module.exports = { scheduledSkipReason, checkoutOutcome };
 
 if (require.main === module) {
   main(process.argv.slice(2)).catch((err) => {

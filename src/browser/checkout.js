@@ -15,23 +15,24 @@ const ATTENDANCE_RPC_TIMEOUT = 30000;
  * @param {boolean} headless - Run in headless mode
  * @param {object} options - Runtime options
  * @param {boolean} [options.checkoutOnly] - Only click when the current action is Check out
+ * @returns {Promise<{clicked: boolean, action: string}>} Whether the button was clicked, and its label
  */
 async function checkInOut(headless = true, options = {}) {
   console.log(`🚀 Starting Check In/Out process...`);
 
   try {
-    await runCheckInOut(headless, options);
+    return await runCheckInOut(headless, options);
   } catch (err) {
     if (err.code !== "BEMO_NOT_LOGGED_IN") throw err;
     // login() opens its own browser on the same profile, so it must run after this one is closed.
     console.log("⚠️ Not logged in, attempting auto-login...");
     await login();
-    await runCheckInOut(headless, options);
+    return runCheckInOut(headless, options);
   }
 }
 
 async function runCheckInOut(headless, { checkoutOnly = false }) {
-  await withBrowser(CONFIG, headless, async (page) => {
+  return withBrowser(CONFIG, headless, async (page) => {
     // 1. Navigate to Check In/Out page
     console.log(`📍 Navigating to: ${CONFIG.urls.checkInOut}`);
     await navigateWithAuth(page, CONFIG.urls.checkInOut);
@@ -57,7 +58,7 @@ async function runCheckInOut(headless, { checkoutOnly = false }) {
 
     if (checkoutOnly && !isCheckoutAction(status)) {
       console.log("ℹ️ Checkout-only mode: current action is not Check out, skipping click.");
-      return;
+      return { clicked: false, action: status.label };
     }
 
     // 4. Click the button and wait for Odoo's answer instead of assuming success
@@ -82,6 +83,7 @@ async function runCheckInOut(headless, { checkoutOnly = false }) {
     }
 
     console.log(`✅ ${status.label} completed successfully!`);
+    return { clicked: true, action: status.label };
   });
 }
 

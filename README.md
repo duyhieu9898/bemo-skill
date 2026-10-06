@@ -16,7 +16,7 @@ Nếu không tìm thấy Chrome: đặt `PUPPETEER_EXECUTABLE_PATH`.
 | npm run | Việc |
 |---|---|
 | `checkout` | Checkout ngay |
-| `checkout:scheduled` | Cron gọi; bỏ qua (exit 10) khi auto tắt |
+| `checkout:scheduled` | Cron gọi; bỏ qua (exit 10) khi auto tắt, hoặc khi Bemo không ở trạng thái checkout được |
 | `sync [-- --previous]` | Đồng bộ chấm công + time-off, tìm ngày đi trễ |
 | `late-days` | Ngày đi trễ chờ xử lý |
 | `verify-timeoff` | Bỏ ngày đã có time-off khỏi danh sách |
