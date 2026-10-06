@@ -218,7 +218,7 @@ const createTimeOffLogger = {
 const dataLogger = {
   saved: (count, filename) => baseLog.success(`Saved ${count} records to ${filename}`),
   notLoggedIn: () => {
-    throw bemoError("Not logged in to Bemo. Run: npm run login", "BEMO_NOT_LOGGED_IN");
+    throw bemoError("Not logged in to Bemo. Run: npm run login (Telegram: /bemo_login)", "BEMO_NOT_LOGGED_IN");
   },
 };
 

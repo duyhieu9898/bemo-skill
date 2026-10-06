@@ -10,7 +10,7 @@ const { withBrowser } = require("../browser/launch");
 const BASE_URL = new URL(CONFIG.urls.login).origin;
 
 function notLoggedIn(detail) {
-  return bemoError(`Not logged in to Bemo${detail ? ` (${detail})` : ""}. Run: npm run login`, "BEMO_NOT_LOGGED_IN");
+  return bemoError(`Not logged in to Bemo${detail ? ` (${detail})` : ""}. Run: npm run login (Telegram: /bemo_login)`, "BEMO_NOT_LOGGED_IN");
 }
 
 /**
