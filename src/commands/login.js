@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Open Chrome to log in to Bemo again (needs a display). Usage: node src/commands/login.js */
+/** Log in to Bemo again (headless Chrome, BEMO_USER/BEMO_PASS from .env). Usage: node src/commands/login.js */
 const { login } = require("../browser/login");
 
 login().catch((err) => {

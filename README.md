@@ -6,7 +6,7 @@ Tự động hoá chấm công và time-off trên Bemo Cloud. Hướng dẫn cho
 
     npm install
     cp .env.example .env   # BEMO_USER, BEMO_PASS, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
-    npm run login          # đăng nhập lần đầu (mở Chrome)
+    npm run login          # đăng nhập (Chrome headless, dùng BEMO_USER/BEMO_PASS)
     npm run cron:install   # checkout 17:00 thứ 2–6 (CRON_SCHEDULE để đổi lịch)
 
 Nếu không tìm thấy Chrome: đặt `PUPPETEER_EXECUTABLE_PATH`.

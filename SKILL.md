@@ -27,7 +27,7 @@ Writes to Bemo or changes behaviour:
 | `leave -- DD/MM/YYYY [...] [--reason "..."] [--dry-run]` | Full-day leave, 08:00–17:00 (may split across leave types) |
 | `auto -- on` / `auto -- off` | Turn scheduled automation on/off (stays until changed) |
 | `cron:install` / `cron:uninstall` | Add/remove the 17:00 weekday checkout cron line |
-| `login` | Open Chrome to log in again (needs a display; ask the user to run it) |
+| `login` | Log in again (headless Chrome, credentials from `.env`) |
 
 Exit code 10 = skipped on purpose (auto off, nothing to create, or checkout found Bemo not checked in / already checked out).
 
@@ -36,7 +36,7 @@ Exit code 10 = skipped on purpose (auto off, nothing to create, or checkout foun
 - Check out only when the user explicitly asks.
 - `timeoff-late` and `leave`: always run the dry run first, show the result, wait for the user's yes, then run `--apply` / without `--dry-run` — with the same dates and reason.
 - "SAVED but differs": the request is on Bemo; report its id, do not recreate, do not delete.
-- Session expired (`BEMO_NOT_LOGGED_IN`): tell the user to run `npm run login`; do not guess data.
+- Session expired (`BEMO_NOT_LOGGED_IN`): `checkout` logs in again by itself (it runs unattended from cron); every other script stops with this error on purpose — tell the user to run `npm run login`; do not guess data.
 - Never print credentials, cookies or tokens from `.env` or the browser profile.
 - Never run or `require()` `scripts/run-cron-telegram.js` in tests or by hand: it performs the real checkout.
 - Any new scheduled job must call `readAuto()` (`src/timeoff/auto.js`) first and skip with exit 10 when off.
