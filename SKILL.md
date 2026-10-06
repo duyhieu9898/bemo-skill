@@ -23,7 +23,7 @@ Writes to Bemo or changes behaviour:
 | Script | Does |
 |---|---|
 | `checkout` | Check out now |
-| `timeoff-late` / `timeoff-late -- --apply` | Dry run (sync first) / create time off for every late day listed by the dry run |
+| `timeoff-late` / `timeoff-late -- --apply` | Dry run (sync first) / create time off for every late day listed by the dry run (refused if the list changed or the dry run is > 5 min old) |
 | `leave -- DD/MM/YYYY [...] [--reason "..."] [--dry-run]` | Full-day leave, 08:00–17:00 (may split across leave types) |
 | `auto -- on` / `auto -- off` | Turn scheduled automation on/off (stays until changed) |
 | `cron:install` / `cron:uninstall` | Add/remove the 17:00 weekday checkout cron line |
