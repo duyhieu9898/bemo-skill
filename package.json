@@ -8,13 +8,14 @@
     "login": "node src/commands/login.js",
     "checkout": "node src/commands/checkout.js",
     "checkout:scheduled": "node src/commands/checkout.js --scheduled",
-    "checkout:auto": "node src/commands/checkout.js --scheduled",
     "sync": "node src/commands/sync.js",
     "late-days": "node src/commands/late-days.js",
     "verify-timeoff": "node src/commands/verify-timeoff.js",
     "leave": "node src/commands/leave.js",
     "timeoff-late": "node src/commands/timeoff-late.js",
-    "auto": "node src/commands/auto.js"
+    "auto": "node src/commands/auto.js",
+    "cron:install": "bash scripts/setup-cron.sh",
+    "cron:uninstall": "bash scripts/setup-cron.sh --remove"
   },
   "dependencies": {
     "dotenv": "^17.3.1",

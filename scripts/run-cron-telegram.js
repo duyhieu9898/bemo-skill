@@ -11,7 +11,8 @@ const runLog = path.join(logDir, "cron-run.log");
 
 const telegramBotToken = process.env.TELEGRAM_BOT_TOKEN;
 const telegramChatId = process.env.TELEGRAM_CHAT_ID;
-const jobCommand = process.env.JOB_COMMAND || "npm run checkout:auto";
+const jobCommand = process.env.JOB_COMMAND || "npm run -s checkout:scheduled";
+const { SKIPPED } = require("../src/shared/exit-codes");
 
 if (process.argv.includes("--help")) {
   console.log(`Usage: node scripts/run-cron-telegram.js
@@ -22,14 +23,8 @@ Environment:
   TELEGRAM_CHAT_ID       Telegram chat id
   JOB_TIMEOUT_MS         Command timeout in milliseconds
 
-Default command: npm run checkout:auto (skips days marked with: npm run overtime -- on)`);
+Default command: npm run -s checkout:scheduled (exit 10 = skipped while the auto switch is off: npm run auto -- off)`);
   process.exit(0);
-}
-
-fs.mkdirSync(logDir, { recursive: true });
-
-if (!telegramBotToken || !telegramChatId) {
-  throw new Error("Missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID in environment");
 }
 
 function formatDate(date = new Date()) {
@@ -42,6 +37,17 @@ function formatDate(date = new Date()) {
 
 function tailLines(text, maxLines) {
   return text.trim().split(/\r?\n/).slice(-maxLines).join("\n") || "(không có output)";
+}
+
+/**
+ * @param {{exitCode: number, signal?: string|null}} result
+ * @returns {{ok: boolean, icon: string, title: string}}
+ */
+function describeResult({ exitCode, signal }) {
+  if (signal) return { ok: false, icon: "❌", title: "Bemo checkout thất bại" };
+  if (exitCode === SKIPPED) return { ok: true, icon: "⏸️", title: "Bemo checkout bỏ qua" };
+  if (exitCode === 0) return { ok: true, icon: "✅", title: "Bemo checkout thành công" };
+  return { ok: false, icon: "❌", title: "Bemo checkout thất bại" };
 }
 
 async function sendTelegram(text) {
@@ -83,6 +89,11 @@ function runCommand(command) {
 }
 
 async function main() {
+  fs.mkdirSync(logDir, { recursive: true });
+  if (!telegramBotToken || !telegramChatId) {
+    throw new Error("Missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID in environment");
+  }
+
   const startedAt = formatDate();
   fs.appendFileSync(runLog, `\n===== ${startedAt} =====\nRunning command: ${jobCommand}\n`);
 
@@ -90,9 +101,7 @@ async function main() {
   fs.appendFileSync(runLog, result.output);
 
   const finishedAt = formatDate();
-  const ok = result.exitCode === 0 && !result.signal;
-  const icon = ok ? "✅" : "❌";
-  const title = ok ? "Bemo checkout thành công" : "Bemo checkout thất bại";
+  const { ok, icon, title } = describeResult(result);
   const outputTitle = ok ? "📋 Kết quả:" : "📋 Lỗi gần nhất:";
   const exitLine = ok ? "" : `\n🔢 Exit code: ${result.exitCode || result.signal}`;
 
@@ -109,17 +118,22 @@ ${tailLines(result.output, ok ? 12 : 16)}`;
   }
 }
 
-main().catch((error) => {
-  const message = `❌ Bemo checkout thất bại
+// Runs the real job (a Bemo checkout): only when started directly, never on require().
+if (require.main === module) {
+  main().catch((error) => {
+    const message = `❌ Bemo checkout thất bại
 🕒 ${formatDate()}
 
 📋 Lỗi gần nhất:
 ${error.message}`;
 
-  sendTelegram(message)
-    .catch(() => {})
-    .finally(() => {
-      console.error(error);
-      process.exit(1);
-    });
-});
+    sendTelegram(message)
+      .catch(() => {})
+      .finally(() => {
+        console.error(error);
+        process.exit(1);
+      });
+  });
+}
+
+module.exports = { describeResult };
