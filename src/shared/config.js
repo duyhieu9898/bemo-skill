@@ -6,22 +6,30 @@ const os = require("os");
 const fs = require("fs");
 require("dotenv").config({ path: path.join(__dirname, "..", "..", ".env"), quiet: true });
 
+const { bemoError } = require("./errors");
+
 const DATA_DIR = path.join(__dirname, "..", "..", "data");
-const DEFAULT_BASE_URL = "https://bap.bemo-cloud.com";
 
-function getBaseUrl() {
-  if (process.env.BEMO_BASE_URL) {
-    return process.env.BEMO_BASE_URL.replace(/\/$/, "");
-  }
-
-  if (process.env.BEMO_SUBDOMAIN) {
-    return `https://${process.env.BEMO_SUBDOMAIN}.bemo-cloud.com`;
-  }
-
-  return DEFAULT_BASE_URL;
+/**
+ * Bemo address from the environment only (no built-in company default)
+ * @param {Record<string, string|undefined>} [env]
+ * @returns {string|null}
+ */
+function getBaseUrl(env = process.env) {
+  if (env.BEMO_BASE_URL) return env.BEMO_BASE_URL.replace(/\/$/, "");
+  if (env.BEMO_SUBDOMAIN) return `https://${env.BEMO_SUBDOMAIN}.bemo-cloud.com`;
+  return null;
 }
 
 const BASE_URL = getBaseUrl();
+
+/**
+ * Call before talking to Bemo
+ * @param {string|null} [baseUrl]
+ */
+function assertConfigured(baseUrl = BASE_URL) {
+  if (!baseUrl) throw bemoError("Bemo address is not configured (BEMO_SUBDOMAIN or BEMO_BASE_URL)", "BEMO_NOT_CONFIGURED");
+}
 
 /**
  * Find Chrome executable path automatically
@@ -81,6 +89,10 @@ function findChromePath() {
 }
 
 module.exports = {
+  baseUrl: BASE_URL,
+  getBaseUrl,
+  assertConfigured,
+
   // Paths (dynamic based on home directory)
   userDataDir: path.join(os.homedir(), ".puppeteer-profile"),
 

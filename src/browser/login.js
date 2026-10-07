@@ -47,6 +47,7 @@ function submitOutcome(stillOnLoginPage) {
  * @returns {Promise<"already"|"logged-in">}
  */
 async function login() {
+  CONFIG.assertConfigured();
   log.header();
   const browser = await createBrowser(CONFIG, true);
   try {

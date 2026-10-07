@@ -7,7 +7,7 @@ const CONFIG = require("../shared/config");
 const { bemoError } = require("../shared");
 const { withBrowser } = require("../browser/launch");
 
-const BASE_URL = new URL(CONFIG.urls.login).origin;
+const BASE_URL = CONFIG.baseUrl;
 
 function notLoggedIn(detail) {
   return bemoError(`Not logged in to Bemo${detail ? ` (${detail})` : ""}. Run: npm run login (Telegram: /bemo_login)`, "BEMO_NOT_LOGGED_IN");
@@ -18,6 +18,7 @@ function notLoggedIn(detail) {
  * @returns {Promise<string>} session_id value (never log it)
  */
 async function readSessionCookie() {
+  CONFIG.assertConfigured();
   return withBrowser(CONFIG, true, async (page) => {
     const cookie = (await page.cookies(BASE_URL)).find((c) => c.name === "session_id");
     if (!cookie) throw notLoggedIn("no session cookie");
@@ -66,6 +67,7 @@ function createClient(sessionId, { fetchImpl = fetch } = {}) {
  * @returns {Promise<{rpc: Object, uid: number, tz: string, context: Object}>}
  */
 async function connect({ sessionId } = {}) {
+  CONFIG.assertConfigured();
   const rpc = createClient(sessionId || (await readSessionCookie()));
   const info = await rpc.call("/web/session/get_session_info", {});
   if (!info?.uid) throw notLoggedIn("no user in session");

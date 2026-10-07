@@ -13,6 +13,7 @@ function say(text) {
 /** @type {Array<[(e: Error & {code?: string}) => boolean, string]>} */
 const RULES = [
   [(e) => e.code === "BEMO_NOT_LOGGED_IN" || /Not logged in/i.test(e.message), "🔐 Hết phiên đăng nhập Bemo → /bemo_login"],
+  [(e) => e.code === "BEMO_NOT_CONFIGURED", "⚙️ Thiếu BEMO_SUBDOMAIN (hoặc BEMO_BASE_URL) trong skills/bemo/.env"],
   [(e) => e.code === "BEMO_BAD_CREDENTIALS", "🔑 Sai BEMO_USER/BEMO_PASS trong .env"],
   [(e) => /ENOTFOUND|ECONNREFUSED|ECONNRESET|ETIMEDOUT|EAI_AGAIN|fetch failed/.test(`${e.code || ""} ${e.message}`), "🌐 Không kết nối được Bemo (mạng?)"],
   [(e) => /Could not find Chrome|Failed to launch the browser|executablePath/i.test(e.message), "🧭 Không mở được Chrome (PUPPETEER_EXECUTABLE_PATH?)"],

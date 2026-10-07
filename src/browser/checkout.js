@@ -18,6 +18,7 @@ const ATTENDANCE_RPC_TIMEOUT = 30000;
  * @returns {Promise<{clicked: boolean, action: string}>} Whether the button was clicked, and its label
  */
 async function checkInOut(headless = true, options = {}) {
+  CONFIG.assertConfigured();
   console.log(`🚀 Starting Check In/Out process...`);
 
   try {
